@@ -1,21 +1,21 @@
 # nestjs-safe-response
 
-Standardized API response wrapper for NestJS — auto-wraps success/error responses, pagination metadata, and Swagger schema generation with a single module import.
+NestJS API 응답을 자동으로 표준화된 JSON 구조로 감싸주는 패키지 — 성공/에러 응답 래핑, 페이지네이션 메타데이터, Swagger 스키마 자동 생성을 모듈 한 줄로 처리합니다.
 
-[한국어](./README.ko.md)
+[English](./README.md)
 
-## Features
+## 주요 기능
 
-- **Automatic response wrapping** — all controller returns wrapped in `{ success, statusCode, data }` structure
-- **Error standardization** — exceptions converted to `{ success: false, error: { code, message, details } }`
-- **Pagination metadata** — auto-calculates `totalPages`, `hasNext`, `hasPrev` from controller return
-- **Swagger integration** — `@ApiSafeResponse(Dto)` generates correct OpenAPI schema with wrapped structure
-- **class-validator support** — validation errors parsed into `details` array with "Validation failed" message
-- **Custom error codes** — map exceptions to machine-readable codes via `errorCodeMapper`
-- **Opt-out per route** — `@RawResponse()` skips wrapping for health checks, SSE, file downloads
-- **Dynamic Module** — `register()` / `registerAsync()` with full DI support
+- **자동 응답 래핑** — 모든 컨트롤러 반환값을 `{ success, statusCode, data }` 구조로 래핑
+- **에러 표준화** — 예외를 `{ success: false, error: { code, message, details } }` 형태로 변환
+- **페이지네이션 메타데이터** — `totalPages`, `hasNext`, `hasPrev` 자동 계산
+- **Swagger 연동** — `@ApiSafeResponse(Dto)`로 래핑된 구조의 OpenAPI 스키마 자동 생성
+- **class-validator 지원** — 유효성 검증 에러를 `details` 배열로 파싱
+- **커스텀 에러 코드** — `errorCodeMapper`로 예외를 머신 리더블 코드에 매핑
+- **라우트별 제외** — `@RawResponse()`로 헬스체크, SSE, 파일 다운로드 등 래핑 건너뛰기
+- **Dynamic Module** — `register()` / `registerAsync()` DI 완전 지원
 
-## Installation
+## 설치
 
 ```bash
 npm install nestjs-safe-response
@@ -27,7 +27,7 @@ npm install nestjs-safe-response
 npm install @nestjs/common @nestjs/core @nestjs/swagger rxjs reflect-metadata
 ```
 
-## Quick Start
+## 빠른 시작
 
 ```typescript
 import { Module } from '@nestjs/common';
@@ -39,11 +39,11 @@ import { SafeResponseModule } from 'nestjs-safe-response';
 export class AppModule {}
 ```
 
-That's it. All routes now return standardized responses.
+이것만으로 모든 라우트가 표준화된 응답을 반환합니다.
 
-## Response Format
+## 응답 형식
 
-### Success
+### 성공 응답
 
 ```json
 {
@@ -55,7 +55,7 @@ That's it. All routes now return standardized responses.
 }
 ```
 
-### Error
+### 에러 응답
 
 ```json
 {
@@ -71,11 +71,11 @@ That's it. All routes now return standardized responses.
 }
 ```
 
-## Decorators
+## 데코레이터
 
 ### `@ApiSafeResponse(Model)`
 
-Documents the Swagger `data` field with a specific DTO type.
+Swagger `data` 필드를 특정 DTO 타입으로 문서화합니다.
 
 ```typescript
 @Get(':id')
@@ -85,11 +85,11 @@ async findOne(@Param('id') id: string) {
 }
 ```
 
-Options: `isArray`, `statusCode`, `description`
+옵션: `isArray`, `statusCode`, `description`
 
 ### `@ApiPaginatedSafeResponse(Model)`
 
-Generates paginated Swagger schema with `meta.pagination`.
+페이지네이션 포함 Swagger 스키마를 자동 생성합니다.
 
 ```typescript
 @Get()
@@ -104,7 +104,7 @@ async findAll(@Query('page') page = 1, @Query('limit') limit = 20) {
 }
 ```
 
-Response:
+응답:
 
 ```json
 {
@@ -126,7 +126,7 @@ Response:
 
 ### `@RawResponse()`
 
-Skips response wrapping for this route.
+해당 라우트의 응답 래핑을 건너뜁니다.
 
 ```typescript
 @Get('health')
@@ -138,7 +138,7 @@ healthCheck() {
 
 ### `@ResponseMessage(message)`
 
-Adds a custom message to `meta.message`.
+`meta.message`에 커스텀 메시지를 추가합니다.
 
 ```typescript
 @Post()
@@ -150,27 +150,27 @@ create(@Body() dto: CreateUserDto) {
 
 ### `@SafeResponse(options?)`
 
-Applies standard wrapping + basic Swagger schema. Options: `description`, `statusCode`.
+표준 래핑 + 기본 Swagger 스키마를 적용합니다. 옵션: `description`, `statusCode`.
 
 ### `@Paginated(options?)`
 
-Enables pagination metadata auto-calculation. Options: `defaultLimit`, `maxLimit`.
+페이지네이션 메타데이터 자동 계산을 활성화합니다. 옵션: `defaultLimit`, `maxLimit`.
 
-## Module Options
+## 모듈 옵션
 
 ```typescript
 SafeResponseModule.register({
-  timestamp: true,         // include timestamp field (default: true)
-  path: true,              // include path field (default: true)
+  timestamp: true,         // timestamp 필드 포함 (기본값: true)
+  path: true,              // path 필드 포함 (기본값: true)
   errorCodeMapper: (exception) => {
     if (exception instanceof TokenExpiredError) return 'TOKEN_EXPIRED';
-    return undefined;      // fall back to default mapping
+    return undefined;      // 기본 매핑 사용
   },
-  dateFormatter: () => new Date().toISOString(),  // custom date format
+  dateFormatter: () => new Date().toISOString(),  // 커스텀 날짜 포맷
 })
 ```
 
-### Async Registration
+### 비동기 등록
 
 ```typescript
 SafeResponseModule.registerAsync({
@@ -182,10 +182,10 @@ SafeResponseModule.registerAsync({
 })
 ```
 
-## Default Error Code Mapping
+## 기본 에러 코드 매핑
 
-| HTTP Status | Error Code |
-|-------------|------------|
+| HTTP 상태 | 에러 코드 |
+|-----------|-----------|
 | 400 | `BAD_REQUEST` |
 | 401 | `UNAUTHORIZED` |
 | 403 | `FORBIDDEN` |
@@ -195,17 +195,17 @@ SafeResponseModule.registerAsync({
 | 429 | `TOO_MANY_REQUESTS` |
 | 500 | `INTERNAL_SERVER_ERROR` |
 
-Override with `errorCodeMapper` option.
+`errorCodeMapper` 옵션으로 커스텀 매핑 가능.
 
-## Compatibility
+## 호환성
 
-| Dependency | Version |
-|------------|---------|
+| 의존성 | 버전 |
+|--------|------|
 | NestJS | v10, v11 |
 | @nestjs/swagger | v7, v8, v11 |
 | Node.js | >= 18 |
 | RxJS | v7 |
 
-## License
+## 라이선스
 
 MIT
