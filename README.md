@@ -1,5 +1,6 @@
 # nestjs-safe-response
 
+[![CI](https://github.com/ksyq12/nestjs-safe-response/actions/workflows/ci.yml/badge.svg)](https://github.com/ksyq12/nestjs-safe-response/actions/workflows/ci.yml)
 [![npm version](https://img.shields.io/npm/v/nestjs-safe-response.svg)](https://www.npmjs.com/package/nestjs-safe-response)
 [![npm downloads](https://img.shields.io/npm/dm/nestjs-safe-response.svg)](https://www.npmjs.com/package/nestjs-safe-response)
 [![license](https://img.shields.io/npm/l/nestjs-safe-response.svg)](https://github.com/ksyq12/nestjs-safe-response/blob/main/LICENSE)
