@@ -28,7 +28,7 @@
     "wrapper"
   ],
   "scripts": {
-    "build": "tsc",
+    "build": "tsc -p tsconfig.build.json",
     "test": "jest",
     "test:cov": "jest --coverage",
     "test:e2e": "jest --config test/jest-e2e.json",
