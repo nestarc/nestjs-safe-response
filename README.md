@@ -1,5 +1,9 @@
 # nestjs-safe-response
 
+[![npm version](https://img.shields.io/npm/v/nestjs-safe-response.svg)](https://www.npmjs.com/package/nestjs-safe-response)
+[![npm downloads](https://img.shields.io/npm/dm/nestjs-safe-response.svg)](https://www.npmjs.com/package/nestjs-safe-response)
+[![license](https://img.shields.io/npm/l/nestjs-safe-response.svg)](https://github.com/ksyq12/nestjs-safe-response/blob/main/LICENSE)
+
 Standardized API response wrapper for NestJS — auto-wraps success/error responses, pagination metadata, and Swagger schema generation with a single module import.
 
 [한국어](./README.ko.md)
