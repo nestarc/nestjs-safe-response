@@ -14,11 +14,15 @@ jobs:
       fail-fast: false
       matrix:
         node-version: [18, 20, 22]
-        nestjs-version: [10, 11]
-        swagger-version: [7, 8, 11]
-        exclude:
-          - nestjs-version: 10
+        include:
+          # Default: NestJS 11 + Swagger 11 (current devDependencies)
+          - nestjs-version: 11
             swagger-version: 11
+            override: false
+          # NestJS 10 + Swagger 8 (cross-version compat)
+          - nestjs-version: 10
+            swagger-version: 8
+            override: true
 
     name: Node ${{ matrix.node-version }} / NestJS ${{ matrix.nestjs-version }} / Swagger ${{ matrix.swagger-version }}
 
@@ -33,19 +37,15 @@ jobs:
 
       - run: npm ci
 
-      - name: Override NestJS version
-        if: matrix.nestjs-version != 11
+      - name: Override to NestJS ${{ matrix.nestjs-version }} + Swagger ${{ matrix.swagger-version }}
+        if: matrix.override
         run: |
-          npm install --no-save \
+          npm install --no-save --legacy-peer-deps \
             @nestjs/common@^${{ matrix.nestjs-version }} \
             @nestjs/core@^${{ matrix.nestjs-version }} \
             @nestjs/platform-express@^${{ matrix.nestjs-version }} \
-            @nestjs/testing@^${{ matrix.nestjs-version }}
-
-      - name: Override Swagger version
-        if: matrix.swagger-version != 11
-        run: |
-          npm install --no-save @nestjs/swagger@^${{ matrix.swagger-version }}
+            @nestjs/testing@^${{ matrix.nestjs-version }} \
+            @nestjs/swagger@^${{ matrix.swagger-version }}
 
       - run: npm run build
       - run: npm test

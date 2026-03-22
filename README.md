@@ -304,7 +304,7 @@ Override with `errorCodeMapper` option.
 |------------|---------|
 | NestJS | v10, v11 |
 | Platform | Express, Fastify |
-| @nestjs/swagger | v7, v8, v11 |
+| @nestjs/swagger | v8, v11 |
 | Node.js | >= 18 |
 | RxJS | v7 |
 

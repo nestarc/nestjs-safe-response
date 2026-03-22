@@ -297,7 +297,7 @@ export class AppModule {}
 |--------|------|
 | NestJS | v10, v11 |
 | 플랫폼 | Express, Fastify |
-| @nestjs/swagger | v7, v8, v11 |
+| @nestjs/swagger | v8, v11 |
 | Node.js | >= 18 |
 | RxJS | v7 |
 
