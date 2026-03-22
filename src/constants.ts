@@ -3,6 +3,8 @@ export const RAW_RESPONSE_KEY = 'RAW_RESPONSE';
 export const PAGINATED_KEY = 'PAGINATED';
 export const RESPONSE_MESSAGE_KEY = 'RESPONSE_MESSAGE';
 
+export const SUCCESS_CODE_KEY = 'SUCCESS_CODE';
+
 export const DEFAULT_ERROR_CODE_MAP: Record<number, string> = {
   400: 'BAD_REQUEST',
   401: 'UNAUTHORIZED',

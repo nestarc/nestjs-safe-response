@@ -9,6 +9,10 @@ export interface SafeResponseModuleOptions {
   errorCodeMapper?: (exception: unknown) => string | undefined;
   /** Custom date formatter function (default: ISO 8601) */
   dateFormatter?: () => string;
+  /** Custom success code mapper function (statusCode → code string) */
+  successCodeMapper?: (statusCode: number) => string | undefined;
+  /** Transform data before wrapping (sync only, runs before pagination check) */
+  transformResponse?: (data: unknown) => unknown;
 }
 
 export interface SafeResponseModuleAsyncOptions
@@ -36,6 +40,7 @@ export interface ResponseMeta {
 export interface SafeSuccessResponse<T = unknown> {
   success: true;
   statusCode: number;
+  code?: string;
   data: T;
   meta?: ResponseMeta;
   timestamp?: string;
