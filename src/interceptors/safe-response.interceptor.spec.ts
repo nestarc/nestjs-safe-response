@@ -539,6 +539,83 @@ describe('SafeResponseInterceptor', () => {
     });
   });
 
+  // ─── 엣지 케이스: 비정형 데이터 ───
+
+  describe('엣지 케이스: 비정형 데이터', () => {
+    beforeEach(() => {
+      jest.spyOn(reflector, 'get').mockReturnValue(undefined);
+    });
+
+    it('undefined 반환 → data가 undefined', async () => {
+      const interceptor = createInterceptor();
+      const ctx = createMockExecutionContext();
+
+      const result = await lastValueFrom(
+        interceptor.intercept(ctx, createMockCallHandler(undefined)),
+      );
+
+      expect(result.success).toBe(true);
+      expect(result.data).toBeUndefined();
+    });
+
+    it('빈 객체 반환 → data가 빈 객체', async () => {
+      const interceptor = createInterceptor();
+      const ctx = createMockExecutionContext();
+
+      const result = await lastValueFrom(
+        interceptor.intercept(ctx, createMockCallHandler({})),
+      );
+
+      expect(result.data).toEqual({});
+    });
+
+    it('빈 배열 반환 → data가 빈 배열', async () => {
+      const interceptor = createInterceptor();
+      const ctx = createMockExecutionContext();
+
+      const result = await lastValueFrom(
+        interceptor.intercept(ctx, createMockCallHandler([])),
+      );
+
+      expect(result.data).toEqual([]);
+      expect(Array.isArray(result.data)).toBe(true);
+    });
+
+    it('숫자 반환 → data가 숫자', async () => {
+      const interceptor = createInterceptor();
+      const ctx = createMockExecutionContext();
+
+      const result = await lastValueFrom(
+        interceptor.intercept(ctx, createMockCallHandler(42)),
+      );
+
+      expect(result.data).toBe(42);
+    });
+
+    it('boolean 반환 → data가 boolean', async () => {
+      const interceptor = createInterceptor();
+      const ctx = createMockExecutionContext();
+
+      const result = await lastValueFrom(
+        interceptor.intercept(ctx, createMockCallHandler(true)),
+      );
+
+      expect(result.data).toBe(true);
+    });
+
+    it('중첩 객체 반환 → data에 중첩 구조 유지', async () => {
+      const interceptor = createInterceptor();
+      const ctx = createMockExecutionContext();
+      const nested = { a: { b: { c: 1 } } };
+
+      const result = await lastValueFrom(
+        interceptor.intercept(ctx, createMockCallHandler(nested)),
+      );
+
+      expect(result.data).toEqual({ a: { b: { c: 1 } } });
+    });
+  });
+
   // ─── 성공 코드 매핑 ───
 
   describe('성공 코드 매핑', () => {
