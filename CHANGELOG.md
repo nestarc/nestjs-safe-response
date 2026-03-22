@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] - 2026-03-22
+
+### Added
+- `transformResponse` option for pre-wrapping data transformation
+- `successCodeMapper` option for custom success code mapping
+- `@SuccessCode()` decorator for per-route success code override
+- `code` field in success response (optional, only when configured)
+- `@Exclude()` interoperability verification with E2E tests
+- `class-transformer` as dev dependency for @Exclude() tests
+- 9 new unit tests and 9 new E2E tests
+
+### Changed
+- `SafeSuccessResponseDto` now includes optional `code` field for Swagger
+
 ## [0.2.0] - 2026-03-22
 
 ### Changed
@@ -42,5 +56,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - NestJS v10 and v11 support
 - @nestjs/swagger v7, v8, and v11 support
 
+[0.3.0]: https://github.com/ksyq12/nestjs-safe-response/releases/tag/v0.3.0
 [0.2.0]: https://github.com/ksyq12/nestjs-safe-response/releases/tag/v0.2.0
 [0.1.0]: https://github.com/ksyq12/nestjs-safe-response/releases/tag/v0.1.0

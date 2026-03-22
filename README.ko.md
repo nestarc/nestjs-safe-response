@@ -174,6 +174,29 @@ create(@Body() dto: CreateUserDto) {
 
 페이지네이션 메타데이터 자동 계산을 활성화합니다. 옵션: `defaultLimit`, `maxLimit`.
 
+### `@SuccessCode(code: string)`
+
+해당 라우트에 커스텀 성공 코드를 설정합니다 (메서드 레벨 전용). `successCodeMapper` 모듈 옵션보다 우선합니다.
+
+```typescript
+@Get()
+@SuccessCode('FETCH_SUCCESS')
+findAll() {
+  return this.usersService.findAll();
+}
+```
+
+응답:
+
+```json
+{
+  "success": true,
+  "statusCode": 200,
+  "code": "FETCH_SUCCESS",
+  "data": [...]
+}
+```
+
 ## 모듈 옵션
 
 ```typescript
@@ -198,6 +221,57 @@ SafeResponseModule.registerAsync({
   }),
   inject: [ConfigService],
 })
+```
+
+### 추가 옵션
+
+| 옵션 | 타입 | 기본값 | 설명 |
+|------|------|--------|------|
+| `successCodeMapper` | `(statusCode: number) => string \| undefined` | `undefined` | HTTP 상태 코드를 성공 코드 문자열에 매핑 |
+| `transformResponse` | `(data: unknown) => unknown` | `undefined` | 응답 래핑 전 데이터 변환 (동기 함수만 지원) |
+
+#### 성공 코드 매핑
+
+```typescript
+SafeResponseModule.register({
+  successCodeMapper: (statusCode) => {
+    const map: Record<number, string> = { 200: 'OK', 201: 'CREATED' };
+    return map[statusCode];
+  },
+})
+```
+
+#### 응답 변환
+
+```typescript
+SafeResponseModule.register({
+  transformResponse: (data) => {
+    if (data && typeof data === 'object' && 'password' in data) {
+      const { password, ...rest } = data as Record<string, unknown>;
+      return rest;
+    }
+    return data;
+  },
+})
+```
+
+## `@Exclude()` 연동
+
+### `class-transformer`와 함께 사용
+
+`nestjs-safe-response`는 NestJS의 `ClassSerializerInterceptor`와 완벽하게 호환됩니다. `@Exclude()`로 표시된 필드는 응답 래핑 전에 올바르게 제거됩니다.
+
+```typescript
+import { ClassSerializerInterceptor, Module } from '@nestjs/common';
+import { APP_INTERCEPTOR } from '@nestjs/core';
+
+@Module({
+  imports: [SafeResponseModule.register()],
+  providers: [
+    { provide: APP_INTERCEPTOR, useClass: ClassSerializerInterceptor },
+  ],
+})
+export class AppModule {}
 ```
 
 ## 기본 에러 코드 매핑

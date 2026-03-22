@@ -181,6 +181,29 @@ Applies standard wrapping + basic Swagger schema. Options: `description`, `statu
 
 Enables pagination metadata auto-calculation. Options: `defaultLimit`, `maxLimit`.
 
+### `@SuccessCode(code: string)`
+
+Set a custom success code for this route (method-level only). Takes priority over `successCodeMapper` module option.
+
+```typescript
+@Get()
+@SuccessCode('FETCH_SUCCESS')
+findAll() {
+  return this.usersService.findAll();
+}
+```
+
+Response:
+
+```json
+{
+  "success": true,
+  "statusCode": 200,
+  "code": "FETCH_SUCCESS",
+  "data": [...]
+}
+```
+
 ## Module Options
 
 ```typescript
@@ -205,6 +228,57 @@ SafeResponseModule.registerAsync({
   }),
   inject: [ConfigService],
 })
+```
+
+### Additional Options
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `successCodeMapper` | `(statusCode: number) => string \| undefined` | `undefined` | Maps HTTP status codes to success code strings |
+| `transformResponse` | `(data: unknown) => unknown` | `undefined` | Transform data before response wrapping (sync only) |
+
+#### Success Code Mapping
+
+```typescript
+SafeResponseModule.register({
+  successCodeMapper: (statusCode) => {
+    const map: Record<number, string> = { 200: 'OK', 201: 'CREATED' };
+    return map[statusCode];
+  },
+})
+```
+
+#### Response Transformation
+
+```typescript
+SafeResponseModule.register({
+  transformResponse: (data) => {
+    if (data && typeof data === 'object' && 'password' in data) {
+      const { password, ...rest } = data as Record<string, unknown>;
+      return rest;
+    }
+    return data;
+  },
+})
+```
+
+## `@Exclude()` Integration
+
+### Using with `class-transformer`
+
+`nestjs-safe-response` works seamlessly with NestJS's `ClassSerializerInterceptor`. Fields decorated with `@Exclude()` are properly removed before response wrapping.
+
+```typescript
+import { ClassSerializerInterceptor, Module } from '@nestjs/common';
+import { APP_INTERCEPTOR } from '@nestjs/core';
+
+@Module({
+  imports: [SafeResponseModule.register()],
+  providers: [
+    { provide: APP_INTERCEPTOR, useClass: ClassSerializerInterceptor },
+  ],
+})
+export class AppModule {}
 ```
 
 ## Default Error Code Mapping
