@@ -12,6 +12,17 @@ import {
   ResponseMessage,
   SuccessCode,
 } from '../../src/decorators';
+import { Exclude } from 'class-transformer';
+
+class UserResponse {
+  id!: number;
+  name!: string;
+  @Exclude() password!: string;
+
+  constructor(partial: Partial<UserResponse>) {
+    Object.assign(this, partial);
+  }
+}
 
 @Controller('test')
 export class TestController {
@@ -83,5 +94,10 @@ export class TestController {
   @Get('transformed')
   transformed() {
     return { id: 1, name: 'Test', password: 'secret123' };
+  }
+
+  @Get('user-exclude')
+  userExclude() {
+    return new UserResponse({ id: 1, name: 'Test', password: 'secret' });
   }
 }

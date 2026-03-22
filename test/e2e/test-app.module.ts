@@ -1,4 +1,6 @@
 import { Module } from '@nestjs/common';
+import { ClassSerializerInterceptor } from '@nestjs/common';
+import { APP_INTERCEPTOR } from '@nestjs/core';
 import { SafeResponseModule } from '../../src/safe-response.module';
 import { TestController } from './test.controller';
 
@@ -85,3 +87,40 @@ export class TestAppSuccessCodeModule {}
   controllers: [TestController],
 })
 export class TestAppSuccessCodePriorityModule {}
+
+// 정상 순서: SafeResponseModule(import)이 먼저 DI에 등록 → ClassSerializer(local)가 나중
+// → ClassSerializer.map() 먼저 실행 → @Exclude() 적용 → SafeResponse.map() 래핑
+@Module({
+  imports: [SafeResponseModule.register()],
+  controllers: [TestController],
+  providers: [
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: ClassSerializerInterceptor,
+    },
+  ],
+})
+export class TestAppExcludeModule {}
+
+// ClassSerializer를 별도 모듈로 분리하여 먼저 import
+@Module({
+  providers: [
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: ClassSerializerInterceptor,
+    },
+  ],
+})
+class ClassSerializerModule {}
+
+// 역순: ClassSerializerModule이 먼저 import → SafeResponse가 나중
+// → SafeResponse.map() 먼저 실행 (래핑) → ClassSerializer.map() (직렬화)
+// → @Exclude()가 래핑된 최상위 객체에 적용, data 내부 password는 살아남음
+@Module({
+  imports: [
+    ClassSerializerModule,
+    SafeResponseModule.register(),
+  ],
+  controllers: [TestController],
+})
+export class TestAppExcludeReversedModule {}

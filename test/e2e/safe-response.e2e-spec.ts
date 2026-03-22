@@ -9,6 +9,8 @@ import {
   TestAppTransformModule,
   TestAppSuccessCodeModule,
   TestAppSuccessCodePriorityModule,
+  TestAppExcludeModule,
+  TestAppExcludeReversedModule,
 } from './test-app.module';
 
 describe('SafeResponse E2E', () => {
@@ -285,6 +287,34 @@ describe('SafeResponse E2E', () => {
         .expect(200);
 
       expect(res.body).not.toHaveProperty('code');
+    });
+  });
+
+  // ─── @Exclude() 공존 ───
+
+  describe('@Exclude() 공존', () => {
+    it('정상 순서: @Exclude() 필드가 응답에서 제거됨', async () => {
+      app = await createApp(TestAppExcludeModule);
+
+      const res = await request(app.getHttpServer())
+        .get('/test/user-exclude')
+        .expect(200);
+
+      expect(res.body.success).toBe(true);
+      expect(res.body.data.id).toBe(1);
+      expect(res.body.data.name).toBe('Test');
+      expect(res.body.data.password).toBeUndefined();
+    });
+
+    it.skip('역순 등록: @Exclude() 필드가 응답에 남아있음 (문서 경고 근거)', async () => {
+      app = await createApp(TestAppExcludeReversedModule);
+
+      const res = await request(app.getHttpServer())
+        .get('/test/user-exclude')
+        .expect(200);
+
+      expect(res.body.success).toBe(true);
+      expect(res.body.data.password).toBeDefined();
     });
   });
 });
