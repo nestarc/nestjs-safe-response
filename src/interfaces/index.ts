@@ -69,3 +69,18 @@ export interface PaginatedResult<T = unknown> {
   page: number;
   limit: number;
 }
+
+export interface ApiSafeErrorResponseOptions {
+  /** Description shown in Swagger UI */
+  description?: string;
+  /** Override the auto-resolved error code from DEFAULT_ERROR_CODE_MAP */
+  code?: string;
+  /** Example error message */
+  message?: string;
+  /** Example details value (type is inferred: array → array schema, object → object schema) */
+  details?: unknown;
+}
+
+export type ApiSafeErrorResponseConfig =
+  | number
+  | ({ status: number } & ApiSafeErrorResponseOptions);

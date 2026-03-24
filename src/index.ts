@@ -12,6 +12,8 @@ export {
   SafeResponse,
   ApiSafeResponse,
   ApiPaginatedSafeResponse,
+  ApiSafeErrorResponse,
+  ApiSafeErrorResponses,
   RawResponse,
   Paginated,
   ResponseMessage,
@@ -28,6 +30,8 @@ export type {
   SafeErrorResponse,
   PaginatedOptions,
   PaginatedResult,
+  ApiSafeErrorResponseOptions,
+  ApiSafeErrorResponseConfig,
 } from './interfaces';
 
 // DTOs (for Swagger)

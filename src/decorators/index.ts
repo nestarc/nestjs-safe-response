@@ -11,7 +11,8 @@ import {
   SafeErrorResponseDto,
   PaginationMetaDto,
 } from '../dto/response.dto';
-import { PaginatedOptions } from '../interfaces';
+import { PaginatedOptions, ApiSafeErrorResponseOptions, ApiSafeErrorResponseConfig } from '../interfaces';
+import { DEFAULT_ERROR_CODE_MAP } from '../constants';
 
 /**
  * Apply standard safe response wrapping + basic Swagger schema.
@@ -104,6 +105,98 @@ export function ApiPaginatedSafeResponse<T extends Type>(
       },
     }),
   );
+}
+
+/**
+ * Infer OpenAPI schema from a details example value.
+ */
+function inferDetailsSchema(details: unknown) {
+  if (Array.isArray(details)) {
+    return { type: 'array' as const, items: { type: 'string' as const }, example: details };
+  }
+  if (typeof details === 'object' && details !== null) {
+    return { type: 'object' as const, example: details };
+  }
+  if (typeof details === 'string') {
+    return { type: 'string' as const, example: details };
+  }
+  return { example: details };
+}
+
+/**
+ * Document a single error response in Swagger with the SafeErrorResponseDto envelope.
+ * Error code auto-resolves from DEFAULT_ERROR_CODE_MAP if not provided.
+ *
+ * @example
+ * ```typescript
+ * @ApiSafeErrorResponse(404)
+ * @ApiSafeErrorResponse(400, { code: 'VALIDATION_ERROR', details: ['email must be an email'] })
+ * ```
+ */
+export function ApiSafeErrorResponse(
+  status: number,
+  options?: ApiSafeErrorResponseOptions,
+): MethodDecorator {
+  const code =
+    options?.code ?? DEFAULT_ERROR_CODE_MAP[status] ?? 'UNKNOWN_ERROR';
+  const message = options?.message ?? 'An error occurred';
+  const description = options?.description ?? `Error response (${status})`;
+
+  const errorProperties = {
+    code: { type: 'string' as const, example: code },
+    message: { type: 'string' as const, example: message },
+    ...(options?.details !== undefined && {
+      details: inferDetailsSchema(options.details),
+    }),
+  };
+
+  return applyDecorators(
+    ApiExtraModels(SafeErrorResponseDto),
+    ApiResponse({
+      status,
+      description,
+      schema: {
+        allOf: [
+          { $ref: getSchemaPath(SafeErrorResponseDto) },
+          {
+            properties: {
+              success: { type: 'boolean' as const, example: false },
+              statusCode: { type: 'number' as const, example: status },
+              error: {
+                type: 'object' as const,
+                properties: errorProperties,
+              },
+            },
+          },
+        ],
+      },
+    }),
+  );
+}
+
+/**
+ * Document multiple error responses in Swagger at once.
+ * Accepts an array of status codes (number) or config objects.
+ *
+ * @example
+ * ```typescript
+ * @ApiSafeErrorResponses([400, 401, 404])
+ * @ApiSafeErrorResponses([
+ *   400,
+ *   { status: 401, description: 'Token expired' },
+ *   { status: 404, code: 'USER_NOT_FOUND' },
+ * ])
+ * ```
+ */
+export function ApiSafeErrorResponses(
+  configs: ApiSafeErrorResponseConfig[],
+): MethodDecorator {
+  const decorators = configs.map((config) =>
+    typeof config === 'number'
+      ? ApiSafeErrorResponse(config)
+      : ApiSafeErrorResponse(config.status, config),
+  );
+  return applyDecorators(...decorators);
 }
 
 /**

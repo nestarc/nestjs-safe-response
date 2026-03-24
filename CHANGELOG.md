@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.0] - 2026-03-24
+
+### Added
+- `@ApiSafeErrorResponse(status, options?)` decorator for documenting error responses in Swagger with the `SafeErrorResponseDto` envelope
+- `@ApiSafeErrorResponses(configs)` bulk decorator for documenting multiple error responses at once
+- `ApiSafeErrorResponseOptions` and `ApiSafeErrorResponseConfig` type exports
+- Automatic error code resolution from `DEFAULT_ERROR_CODE_MAP` (e.g., 404 → `NOT_FOUND`)
+- `details` schema auto-inference from example value type (array → array schema, object → object schema, string → string schema)
+- Swagger schema E2E verification tests using `SwaggerModule.createDocument()`
+- Unit tests for error response decorators (13 cases)
+- E2E tests for Swagger schema output (20 cases)
+
 ## [0.5.0] - 2026-03-23
 
 ### Removed

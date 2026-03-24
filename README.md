@@ -149,6 +149,55 @@ Response:
 }
 ```
 
+### `@ApiSafeErrorResponse(status, options?)`
+
+Documents an error response in Swagger with the `SafeErrorResponseDto` envelope. Error codes are auto-resolved from `DEFAULT_ERROR_CODE_MAP`.
+
+```typescript
+@Get(':id')
+@ApiSafeResponse(UserDto)
+@ApiSafeErrorResponse(404)
+@ApiSafeErrorResponse(400, {
+  code: 'VALIDATION_ERROR',
+  message: 'Input validation failed',
+  details: ['email must be an email'],
+})
+async findOne(@Param('id') id: string) {
+  return this.usersService.findOne(id);
+}
+```
+
+Options: `description`, `code`, `message`, `details`
+
+The `details` field schema is automatically inferred from the example value:
+- `string[]` → `{ type: 'array', items: { type: 'string' } }`
+- `object` → `{ type: 'object' }`
+- `string` → `{ type: 'string' }`
+
+### `@ApiSafeErrorResponses(configs)`
+
+Documents multiple error responses at once. Accepts an array of status codes or config objects.
+
+```typescript
+@Post()
+@ApiSafeResponse(UserDto, { statusCode: 201 })
+@ApiSafeErrorResponses([400, 401, 409])
+async create(@Body() dto: CreateUserDto) {
+  return this.usersService.create(dto);
+}
+
+// With mixed configuration
+@Post('register')
+@ApiSafeErrorResponses([
+  400,
+  { status: 401, description: 'Token expired' },
+  { status: 409, code: 'EMAIL_TAKEN', message: 'Email already registered' },
+])
+async register(@Body() dto: RegisterDto) {
+  return this.authService.register(dto);
+}
+```
+
 ### `@RawResponse()`
 
 Skips response wrapping for this route.

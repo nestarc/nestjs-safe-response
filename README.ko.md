@@ -142,6 +142,55 @@ async findAll(@Query('page') page = 1, @Query('limit') limit = 20) {
 }
 ```
 
+### `@ApiSafeErrorResponse(status, options?)`
+
+에러 응답을 `SafeErrorResponseDto` 엔벨로프로 Swagger에 문서화합니다. 에러 코드는 `DEFAULT_ERROR_CODE_MAP`에서 자동 해석됩니다.
+
+```typescript
+@Get(':id')
+@ApiSafeResponse(UserDto)
+@ApiSafeErrorResponse(404)
+@ApiSafeErrorResponse(400, {
+  code: 'VALIDATION_ERROR',
+  message: '입력값 검증 실패',
+  details: ['email must be an email'],
+})
+async findOne(@Param('id') id: string) {
+  return this.usersService.findOne(id);
+}
+```
+
+옵션: `description`, `code`, `message`, `details`
+
+`details` 필드 스키마는 예시값에서 자동 추론됩니다:
+- `string[]` → `{ type: 'array', items: { type: 'string' } }`
+- `object` → `{ type: 'object' }`
+- `string` → `{ type: 'string' }`
+
+### `@ApiSafeErrorResponses(configs)`
+
+여러 에러 응답을 한 번에 문서화합니다. 상태 코드 배열 또는 설정 객체 배열을 받습니다.
+
+```typescript
+@Post()
+@ApiSafeResponse(UserDto, { statusCode: 201 })
+@ApiSafeErrorResponses([400, 401, 409])
+async create(@Body() dto: CreateUserDto) {
+  return this.usersService.create(dto);
+}
+
+// 혼합 설정
+@Post('register')
+@ApiSafeErrorResponses([
+  400,
+  { status: 401, description: '토큰 만료' },
+  { status: 409, code: 'EMAIL_TAKEN', message: '이미 등록된 이메일' },
+])
+async register(@Body() dto: RegisterDto) {
+  return this.authService.register(dto);
+}
+```
+
 ### `@RawResponse()`
 
 해당 라우트의 응답 래핑을 건너뜁니다.
