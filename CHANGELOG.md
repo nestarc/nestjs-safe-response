@@ -17,6 +17,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Unit tests for error response decorators (13 cases)
 - E2E tests for Swagger schema output (20 cases)
 
+### Fixed
+- `@ApiSafeResponse()` now respects the `statusCode` option — previously it always emitted HTTP 200 via `ApiOkResponse()` regardless of the option value. Now uses `ApiResponse({ status })` so `statusCode: 201` correctly appears as a 201 response in Swagger.
+
 ## [0.5.0] - 2026-03-23
 
 ### Removed

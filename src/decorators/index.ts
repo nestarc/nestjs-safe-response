@@ -52,7 +52,8 @@ export function ApiSafeResponse<T extends Type>(
 
   return applyDecorators(
     ApiExtraModels(SafeSuccessResponseDto, model),
-    ApiOkResponse({
+    ApiResponse({
+      status: statusCode,
       description,
       schema: {
         allOf: [

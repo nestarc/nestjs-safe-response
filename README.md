@@ -182,7 +182,7 @@ Documents multiple error responses at once. Accepts an array of status codes or 
 
 ```typescript
 @Post()
-@ApiSafeResponse(UserDto)
+@ApiSafeResponse(UserDto, { statusCode: 201 })
 @ApiSafeErrorResponses([400, 401, 409])
 async create(@Body() dto: CreateUserDto) {
   return this.usersService.create(dto);

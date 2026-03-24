@@ -64,6 +64,23 @@ describe('Swagger Schema E2E', () => {
     });
   });
 
+  // ─── @ApiSafeResponse() statusCode 옵션 ───
+
+  describe('@ApiSafeResponse() statusCode 옵션', () => {
+    it('statusCode: 201 → Swagger에 201 응답으로 문서화되어야 한다', () => {
+      const responses = document.paths['/swagger-test/create-user'].post.responses;
+      expect(responses['201']).toBeDefined();
+      expect(responses['201'].description).toBe('User created');
+      const schema = responses['201'].content['application/json'].schema;
+      expect(schema.allOf[0].$ref).toContain('SafeSuccessResponseDto');
+    });
+
+    it('statusCode: 201 → 200 응답이 존재하지 않아야 한다', () => {
+      const responses = document.paths['/swagger-test/create-user'].post.responses;
+      expect(responses['200']).toBeUndefined();
+    });
+  });
+
   // ─── @ApiPaginatedSafeResponse() ───
 
   describe('@ApiPaginatedSafeResponse() (GET /swagger-test/paginated)', () => {

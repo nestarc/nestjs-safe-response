@@ -27,6 +27,13 @@ export class SwaggerTestController {
     return { id: 1, name: 'John' };
   }
 
+  /** ApiSafeResponse with non-200 statusCode */
+  @Post('create-user')
+  @ApiSafeResponse(UserDto, { statusCode: 201, description: 'User created' })
+  createUserTyped() {
+    return { id: 1, name: 'John' };
+  }
+
   /** Custom code override */
   @Get('custom-code')
   @ApiSafeErrorResponse(400, { code: 'VALIDATION_ERROR', message: 'Input validation failed' })
