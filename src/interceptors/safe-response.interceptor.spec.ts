@@ -82,6 +82,24 @@ describe('SafeResponseInterceptor', () => {
     });
   });
 
+  // ─── @Optional() 기본값 ───
+
+  describe('@Optional() 기본값', () => {
+    it('options 미주입 시 기본값 {} 사용', async () => {
+      jest.spyOn(reflector, 'get').mockReturnValue(undefined);
+      const interceptor = new SafeResponseInterceptor(reflector);
+      const ctx = createMockExecutionContext();
+
+      const result = await lastValueFrom(
+        interceptor.intercept(ctx, createMockCallHandler({ id: 1 })),
+      );
+
+      expect(result.success).toBe(true);
+      expect(result).toHaveProperty('timestamp');
+      expect(result).toHaveProperty('path');
+    });
+  });
+
   // ─── 기본 응답 래핑 ───
 
   describe('기본 응답 래핑', () => {

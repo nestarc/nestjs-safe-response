@@ -367,6 +367,75 @@ describe('SafeExceptionFilter', () => {
     });
   });
 
+  // ─── @Optional() 기본값 ───
+
+  describe('@Optional() 기본값', () => {
+    it('options 미주입 시 기본값 {} 사용', () => {
+      const { adapterHost, replyFn } = createMockHttpAdapterHost();
+      const filter = new SafeExceptionFilter(adapterHost);
+      const host = createMockArgumentsHost();
+
+      filter.catch(new BadRequestException(), host);
+
+      const body = replyFn.mock.calls[0][1];
+      expect(body.success).toBe(false);
+      expect(body).toHaveProperty('timestamp');
+      expect(body).toHaveProperty('path');
+    });
+  });
+
+  // ─── HttpException response 분기 ───
+
+  describe('HttpException response 분기', () => {
+    it('response가 string인 경우 → 해당 string이 message', () => {
+      const { adapterHost, replyFn } = createMockHttpAdapterHost();
+      const filter = createFilter(adapterHost);
+      const host = createMockArgumentsHost();
+
+      filter.catch(new HttpException('Direct string', 400), host);
+
+      const body = replyFn.mock.calls[0][1];
+      expect(body.error.message).toBe('Direct string');
+    });
+
+    it('response가 object이고 message가 undefined인 경우 → 기본 message 유지', () => {
+      const { adapterHost, replyFn } = createMockHttpAdapterHost();
+      const filter = createFilter(adapterHost);
+      const host = createMockArgumentsHost();
+
+      filter.catch(new HttpException({ error: 'Bad Request' }, 400), host);
+
+      const body = replyFn.mock.calls[0][1];
+      expect(body.error.message).toBe('Internal server error');
+    });
+
+    it('response가 object이고 message가 number인 경우 → 기본 message 유지', () => {
+      const { adapterHost, replyFn } = createMockHttpAdapterHost();
+      const filter = createFilter(adapterHost);
+      const host = createMockArgumentsHost();
+
+      filter.catch(new HttpException({ message: 123 }, 400), host);
+
+      const body = replyFn.mock.calls[0][1];
+      expect(body.error.message).toBe('Internal server error');
+    });
+
+    it('response가 string도 object도 아닌 경우 → 기본 message 유지', () => {
+      const { adapterHost, replyFn } = createMockHttpAdapterHost();
+      const filter = createFilter(adapterHost);
+      const host = createMockArgumentsHost();
+
+      // HttpException.getResponse()가 number를 반환하도록 mock
+      const exception = new HttpException('test', 400);
+      jest.spyOn(exception, 'getResponse').mockReturnValue(42 as any);
+
+      filter.catch(exception, host);
+
+      const body = replyFn.mock.calls[0][1];
+      expect(body.error.message).toBe('Internal server error');
+    });
+  });
+
   // ─── 옵션 ───
 
   describe('옵션', () => {
