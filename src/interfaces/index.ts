@@ -1,5 +1,12 @@
 import { ModuleMetadata } from '@nestjs/common';
 
+export interface RequestIdOptions {
+  /** Custom header name (default: 'X-Request-Id') */
+  headerName?: string;
+  /** Custom ID generator (default: crypto.randomUUID()) */
+  generator?: () => string;
+}
+
 export interface SafeResponseModuleOptions {
   /** Include timestamp field in responses (default: true) */
   timestamp?: boolean;
@@ -13,6 +20,8 @@ export interface SafeResponseModuleOptions {
   successCodeMapper?: (statusCode: number) => string | undefined;
   /** Transform data before wrapping (sync only, runs before pagination check) */
   transformResponse?: (data: unknown) => unknown;
+  /** Enable request ID tracking. true uses defaults, or pass options object. */
+  requestId?: boolean | RequestIdOptions;
 }
 
 export interface SafeResponseModuleAsyncOptions
@@ -24,6 +33,7 @@ export interface SafeResponseModuleAsyncOptions
 }
 
 export interface PaginationMeta {
+  type?: 'offset';
   page: number;
   limit: number;
   total: number;
@@ -32,8 +42,17 @@ export interface PaginationMeta {
   hasPrev: boolean;
 }
 
+export interface CursorPaginationMeta {
+  type: 'cursor';
+  nextCursor: string | null;
+  previousCursor: string | null;
+  hasMore: boolean;
+  limit: number;
+  totalCount?: number;
+}
+
 export interface ResponseMeta {
-  pagination?: PaginationMeta;
+  pagination?: PaginationMeta | CursorPaginationMeta;
   message?: string;
 }
 
@@ -41,6 +60,7 @@ export interface SafeSuccessResponse<T = unknown> {
   success: true;
   statusCode: number;
   code?: string;
+  requestId?: string;
   data: T;
   meta?: ResponseMeta;
   timestamp?: string;
@@ -50,6 +70,7 @@ export interface SafeSuccessResponse<T = unknown> {
 export interface SafeErrorResponse {
   success: false;
   statusCode: number;
+  requestId?: string;
   error: {
     code: string;
     message: string;
@@ -68,6 +89,19 @@ export interface PaginatedResult<T = unknown> {
   total: number;
   page: number;
   limit: number;
+}
+
+export interface CursorPaginatedOptions {
+  maxLimit?: number;
+}
+
+export interface CursorPaginatedResult<T = unknown> {
+  data: T[];
+  nextCursor: string | null;
+  previousCursor?: string | null;
+  hasMore: boolean;
+  limit: number;
+  totalCount?: number;
 }
 
 export interface ApiSafeErrorResponseOptions {

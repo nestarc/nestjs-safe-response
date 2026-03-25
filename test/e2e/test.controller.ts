@@ -9,6 +9,7 @@ import {
 import {
   RawResponse,
   Paginated,
+  CursorPaginated,
   ResponseMessage,
   SuccessCode,
 } from '../../src/decorators';
@@ -99,6 +100,30 @@ export class TestController {
   @Get('user-exclude')
   userExclude() {
     return new UserResponse({ id: 1, name: 'Test', password: 'secret' });
+  }
+
+  @Get('cursor-paginated')
+  @CursorPaginated()
+  cursorPaginated() {
+    return {
+      data: [{ id: 1 }, { id: 2 }],
+      nextCursor: 'abc123',
+      previousCursor: null,
+      hasMore: true,
+      limit: 20,
+    };
+  }
+
+  @Get('cursor-paginated-total')
+  @CursorPaginated()
+  cursorPaginatedWithTotal() {
+    return {
+      data: [{ id: 1 }],
+      nextCursor: null,
+      hasMore: false,
+      limit: 20,
+      totalCount: 1,
+    };
   }
 
   @Get('edge-undefined')

@@ -5,13 +5,14 @@ import {
   ApiResponse,
   getSchemaPath,
 } from '@nestjs/swagger';
-import { RAW_RESPONSE_KEY, PAGINATED_KEY, RESPONSE_MESSAGE_KEY, SUCCESS_CODE_KEY } from '../constants';
+import { RAW_RESPONSE_KEY, PAGINATED_KEY, RESPONSE_MESSAGE_KEY, SUCCESS_CODE_KEY, CURSOR_PAGINATED_KEY } from '../constants';
 import {
   SafeSuccessResponseDto,
   SafeErrorResponseDto,
   PaginationMetaDto,
+  CursorPaginationMetaDto,
 } from '../dto/response.dto';
-import { PaginatedOptions, ApiSafeErrorResponseOptions, ApiSafeErrorResponseConfig } from '../interfaces';
+import { PaginatedOptions, CursorPaginatedOptions, ApiSafeErrorResponseOptions, ApiSafeErrorResponseConfig } from '../interfaces';
 import { DEFAULT_ERROR_CODE_MAP } from '../constants';
 
 /**
@@ -208,15 +209,59 @@ export function ApiSafeErrorResponses(
 }
 
 /**
+ * Document a cursor-paginated response with Swagger schema.
+ */
+export function ApiCursorPaginatedSafeResponse<T extends Type>(
+  model: T,
+  options?: { description?: string },
+): MethodDecorator {
+  const description = options?.description ?? 'Cursor-paginated response';
+
+  return applyDecorators(
+    ApiExtraModels(SafeSuccessResponseDto, CursorPaginationMetaDto, model),
+    ApiOkResponse({
+      description,
+      schema: {
+        allOf: [
+          { $ref: getSchemaPath(SafeSuccessResponseDto) },
+          {
+            properties: {
+              data: {
+                type: 'array',
+                items: { $ref: getSchemaPath(model) },
+              },
+              meta: {
+                properties: {
+                  pagination: {
+                    $ref: getSchemaPath(CursorPaginationMetaDto),
+                  },
+                },
+              },
+              success: { type: 'boolean', example: true },
+            },
+          },
+        ],
+      },
+    }),
+  );
+}
+
+/**
  * Skip response wrapping for this route.
  */
 export const RawResponse = () => SetMetadata(RAW_RESPONSE_KEY, true);
 
 /**
- * Enable pagination metadata auto-calculation.
+ * Enable offset pagination metadata auto-calculation.
  */
 export const Paginated = (options?: PaginatedOptions) =>
   SetMetadata(PAGINATED_KEY, options ?? true);
+
+/**
+ * Enable cursor-based pagination metadata auto-calculation.
+ */
+export const CursorPaginated = (options?: CursorPaginatedOptions) =>
+  SetMetadata(CURSOR_PAGINATED_KEY, options ?? true);
 
 /**
  * Set a custom message in the response meta.

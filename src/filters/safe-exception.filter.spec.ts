@@ -28,8 +28,8 @@ function createMockHttpAdapterHost(url = '/test', method = 'GET') {
 }
 
 function createMockArgumentsHost(contextType = 'http') {
-  const mockRequest = {};
-  const mockResponse = {};
+  const mockRequest: Record<string, unknown> = { headers: {} };
+  const mockResponse = { setHeader: jest.fn() };
 
   return {
     getType: () => contextType,
@@ -38,6 +38,31 @@ function createMockArgumentsHost(contextType = 'http') {
       getResponse: () => mockResponse,
     }),
   } as unknown as ArgumentsHost;
+}
+
+function createMockArgumentsHostWithRequestId(options: {
+  headers?: Record<string, string>;
+  storedRequestId?: string;
+}) {
+  const setHeaderFn = jest.fn();
+  const mockRequest: Record<string, unknown> = {
+    headers: options.headers ?? {},
+  };
+  if (options.storedRequestId) {
+    mockRequest.__safeResponseRequestId = options.storedRequestId;
+  }
+  const mockResponse = { setHeader: setHeaderFn };
+
+  return {
+    host: {
+      getType: () => 'http',
+      switchToHttp: () => ({
+        getRequest: () => mockRequest,
+        getResponse: () => mockResponse,
+      }),
+    } as unknown as ArgumentsHost,
+    setHeaderFn,
+  };
 }
 
 describe('SafeExceptionFilter', () => {
@@ -489,6 +514,72 @@ describe('SafeExceptionFilter', () => {
       filter.catch(new BadRequestException(), host);
 
       expect(replyFn.mock.calls[0][1].timestamp).toBe('2025-01-01T00:00:00Z');
+    });
+  });
+
+  // ─── 요청 ID ───
+
+  describe('요청 ID (requestId)', () => {
+    it('requestId: true + 인터셉터가 저장한 ID → 해당 값 사용', () => {
+      const { adapterHost, replyFn } = createMockHttpAdapterHost();
+      const filter = createFilter(adapterHost, { requestId: true });
+      const { host } = createMockArgumentsHostWithRequestId({
+        storedRequestId: 'stored-id-123',
+      });
+
+      filter.catch(new BadRequestException(), host);
+
+      const body = replyFn.mock.calls[0][1];
+      expect(body.requestId).toBe('stored-id-123');
+    });
+
+    it('requestId: true + 저장된 ID 없음 + 헤더 있음 → 헤더 값 사용', () => {
+      const { adapterHost, replyFn } = createMockHttpAdapterHost();
+      const filter = createFilter(adapterHost, { requestId: true });
+      const { host } = createMockArgumentsHostWithRequestId({
+        headers: { 'x-request-id': 'header-id-456' },
+      });
+
+      filter.catch(new NotFoundException(), host);
+
+      const body = replyFn.mock.calls[0][1];
+      expect(body.requestId).toBe('header-id-456');
+    });
+
+    it('requestId: true + 저장된 ID 없음 + 헤더 없음 → UUID 자동 생성', () => {
+      const { adapterHost, replyFn } = createMockHttpAdapterHost();
+      const filter = createFilter(adapterHost, { requestId: true });
+      const { host } = createMockArgumentsHostWithRequestId({});
+
+      filter.catch(new BadRequestException(), host);
+
+      const body = replyFn.mock.calls[0][1];
+      expect(body.requestId).toBeDefined();
+      expect(typeof body.requestId).toBe('string');
+      expect(body.requestId.length).toBeGreaterThan(0);
+    });
+
+    it('requestId 미설정 → requestId 필드 없음', () => {
+      const { adapterHost, replyFn } = createMockHttpAdapterHost();
+      const filter = createFilter(adapterHost);
+      const host = createMockArgumentsHost();
+
+      filter.catch(new BadRequestException(), host);
+
+      const body = replyFn.mock.calls[0][1];
+      expect(body).not.toHaveProperty('requestId');
+    });
+
+    it('requestId: true → 응답 헤더에 X-Request-Id 설정', () => {
+      const { adapterHost } = createMockHttpAdapterHost();
+      const filter = createFilter(adapterHost, { requestId: true });
+      const { host, setHeaderFn } = createMockArgumentsHostWithRequestId({
+        storedRequestId: 'test-id',
+      });
+
+      filter.catch(new BadRequestException(), host);
+
+      expect(setHeaderFn).toHaveBeenCalledWith('X-Request-Id', 'test-id');
     });
   });
 });

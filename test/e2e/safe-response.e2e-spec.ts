@@ -11,6 +11,8 @@ import {
   TestAppSuccessCodePriorityModule,
   TestAppExcludeModule,
   TestAppExcludeReversedModule,
+  TestAppRequestIdModule,
+  TestAppCustomRequestIdModule,
 } from './test-app.module';
 
 describe('SafeResponse E2E', () => {
@@ -368,5 +370,98 @@ describe('SafeResponse E2E', () => {
     // import되면 @Exclude()가 래핑된 최상위 객체에 적용되어 data 내부 password가 살아남음.
     // 정상 순서(SafeResponseModule 먼저 import)를 사용하면 문제 없음.
     // 참고: TestAppExcludeReversedModule에서 재현 가능.
+  });
+
+  // ─── 요청 ID ───
+
+  describe('요청 ID', () => {
+    it('requestId: true → 응답에 requestId 포함 + X-Request-Id 헤더', async () => {
+      app = await createApp(TestAppRequestIdModule);
+
+      const res = await request(app.getHttpServer()).get('/test').expect(200);
+
+      expect(res.body.requestId).toBeDefined();
+      expect(typeof res.body.requestId).toBe('string');
+      expect(res.headers['x-request-id']).toBe(res.body.requestId);
+    });
+
+    it('수신 X-Request-Id 헤더 → 응답에 동일 ID 반영', async () => {
+      app = await createApp(TestAppRequestIdModule);
+
+      const res = await request(app.getHttpServer())
+        .get('/test')
+        .set('X-Request-Id', 'my-custom-id')
+        .expect(200);
+
+      expect(res.body.requestId).toBe('my-custom-id');
+      expect(res.headers['x-request-id']).toBe('my-custom-id');
+    });
+
+    it('에러 응답에도 requestId 포함', async () => {
+      app = await createApp(TestAppRequestIdModule);
+
+      const res = await request(app.getHttpServer())
+        .get('/test/not-found')
+        .expect(404);
+
+      expect(res.body.requestId).toBeDefined();
+      expect(res.headers['x-request-id']).toBeDefined();
+    });
+
+    it('커스텀 헤더명 X-Correlation-Id', async () => {
+      app = await createApp(TestAppCustomRequestIdModule);
+
+      const res = await request(app.getHttpServer())
+        .get('/test')
+        .set('X-Correlation-Id', 'corr-123')
+        .expect(200);
+
+      expect(res.body.requestId).toBe('corr-123');
+      expect(res.headers['x-correlation-id']).toBe('corr-123');
+    });
+  });
+
+  // ─── 커서 기반 페이지네이션 ───
+
+  describe('커서 기반 페이지네이션', () => {
+    beforeEach(async () => {
+      app = await createApp(TestAppModule);
+    });
+
+    it('GET /test/cursor-paginated → cursor pagination 메타', async () => {
+      const res = await request(app.getHttpServer())
+        .get('/test/cursor-paginated')
+        .expect(200);
+
+      expect(res.body.success).toBe(true);
+      expect(res.body.data).toEqual([{ id: 1 }, { id: 2 }]);
+      expect(res.body.meta.pagination).toEqual({
+        type: 'cursor',
+        nextCursor: 'abc123',
+        previousCursor: null,
+        hasMore: true,
+        limit: 20,
+      });
+    });
+
+    it('GET /test/cursor-paginated-total → totalCount 포함', async () => {
+      const res = await request(app.getHttpServer())
+        .get('/test/cursor-paginated-total')
+        .expect(200);
+
+      expect(res.body.meta.pagination.type).toBe('cursor');
+      expect(res.body.meta.pagination.totalCount).toBe(1);
+      expect(res.body.meta.pagination.hasMore).toBe(false);
+      expect(res.body.meta.pagination.nextCursor).toBeNull();
+    });
+
+    it('GET /test/paginated → type: offset 포함', async () => {
+      const res = await request(app.getHttpServer())
+        .get('/test/paginated')
+        .expect(200);
+
+      expect(res.body.meta.pagination.type).toBe('offset');
+      expect(res.body.meta.pagination.page).toBe(2);
+    });
   });
 });

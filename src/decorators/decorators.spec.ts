@@ -2,9 +2,11 @@ import {
   SafeResponse,
   ApiSafeResponse,
   ApiPaginatedSafeResponse,
+  ApiCursorPaginatedSafeResponse,
   ApiSafeErrorResponse,
   RawResponse,
   Paginated,
+  CursorPaginated,
   ResponseMessage,
   SuccessCode,
 } from './index';
@@ -12,6 +14,7 @@ import { ApiProperty } from '@nestjs/swagger';
 import {
   RAW_RESPONSE_KEY,
   PAGINATED_KEY,
+  CURSOR_PAGINATED_KEY,
   RESPONSE_MESSAGE_KEY,
   SUCCESS_CODE_KEY,
 } from '../constants';
@@ -207,6 +210,54 @@ describe('ApiPaginatedSafeResponse', () => {
 });
 
 // ---------------------------------------------------------------------------
+// ApiCursorPaginatedSafeResponse
+// ---------------------------------------------------------------------------
+describe('ApiCursorPaginatedSafeResponse', () => {
+  it('should set 200 response with array data and cursor pagination meta', () => {
+    class TestController {
+      @ApiCursorPaginatedSafeResponse(UserDto)
+      findAll() {}
+    }
+
+    const meta = getResponseMetadata(TestController.prototype, 'findAll');
+    expect(meta[200]).toBeDefined();
+    expect(meta[200].description).toBe('Cursor-paginated response');
+
+    const schema = meta[200].schema;
+    expect(schema.allOf).toHaveLength(2);
+
+    const props = schema.allOf[1].properties;
+    expect(props.data.type).toBe('array');
+    expect(props.data.items.$ref).toContain('UserDto');
+    expect(props.meta.properties.pagination.$ref).toContain('CursorPaginationMetaDto');
+    expect(props.success.example).toBe(true);
+  });
+
+  it('should respect custom description', () => {
+    class TestController {
+      @ApiCursorPaginatedSafeResponse(UserDto, { description: 'Cursor list' })
+      findAll() {}
+    }
+
+    const meta = getResponseMetadata(TestController.prototype, 'findAll');
+    expect(meta[200].description).toBe('Cursor list');
+  });
+
+  it('should register CursorPaginationMetaDto as extra model', () => {
+    class TestController {
+      @ApiCursorPaginatedSafeResponse(UserDto)
+      findAll() {}
+    }
+
+    const models = getExtraModels(TestController.prototype, 'findAll');
+    const modelNames = models.map((m: any) => m.name);
+    expect(modelNames).toContain('CursorPaginationMetaDto');
+    expect(modelNames).toContain('UserDto');
+    expect(modelNames).toContain('SafeSuccessResponseDto');
+  });
+});
+
+// ---------------------------------------------------------------------------
 // SetMetadata wrappers
 // ---------------------------------------------------------------------------
 describe('RawResponse', () => {
@@ -240,6 +291,28 @@ describe('Paginated', () => {
 
     const value = Reflect.getMetadata(PAGINATED_KEY, TestController.prototype.findAll);
     expect(value).toEqual({});
+  });
+});
+
+describe('CursorPaginated', () => {
+  it('should set CURSOR_PAGINATED metadata to true when no options', () => {
+    class TestController {
+      @CursorPaginated()
+      findAll() {}
+    }
+
+    const value = Reflect.getMetadata(CURSOR_PAGINATED_KEY, TestController.prototype.findAll);
+    expect(value).toBe(true);
+  });
+
+  it('should set CURSOR_PAGINATED metadata with options object', () => {
+    class TestController {
+      @CursorPaginated({ maxLimit: 50 })
+      findAll() {}
+    }
+
+    const value = Reflect.getMetadata(CURSOR_PAGINATED_KEY, TestController.prototype.findAll);
+    expect(value).toEqual({ maxLimit: 50 });
   });
 });
 

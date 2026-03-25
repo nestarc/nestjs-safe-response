@@ -2,7 +2,7 @@ import { CallHandler, ExecutionContext } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { of, lastValueFrom } from 'rxjs';
 import { SafeResponseInterceptor } from './safe-response.interceptor';
-import { RAW_RESPONSE_KEY, PAGINATED_KEY, RESPONSE_MESSAGE_KEY, SUCCESS_CODE_KEY } from '../constants';
+import { RAW_RESPONSE_KEY, PAGINATED_KEY, CURSOR_PAGINATED_KEY, RESPONSE_MESSAGE_KEY, SUCCESS_CODE_KEY } from '../constants';
 import { SafeResponseModuleOptions } from '../interfaces';
 
 function createMockExecutionContext(overrides?: {
@@ -10,16 +10,29 @@ function createMockExecutionContext(overrides?: {
   statusCode?: number;
   handler?: () => void;
   contextType?: string;
+  headers?: Record<string, string>;
 }): ExecutionContext {
   const handler = overrides?.handler ?? (() => {});
+  const setHeaderFn = jest.fn();
+  const mockResponse = {
+    statusCode: overrides?.statusCode ?? 200,
+    setHeader: setHeaderFn,
+  };
+  const mockRequest = {
+    url: overrides?.url ?? '/test',
+    headers: overrides?.headers ?? {},
+  };
   return {
     getType: () => overrides?.contextType ?? 'http',
     getHandler: () => handler,
     getClass: () => ({}),
     switchToHttp: () => ({
-      getRequest: () => ({ url: overrides?.url ?? '/test' }),
-      getResponse: () => ({ statusCode: overrides?.statusCode ?? 200 }),
+      getRequest: () => mockRequest,
+      getResponse: () => mockResponse,
     }),
+    __mockRequest: mockRequest,
+    __mockResponse: mockResponse,
+    __setHeaderFn: setHeaderFn,
   } as unknown as ExecutionContext;
 }
 
@@ -212,7 +225,7 @@ describe('SafeResponseInterceptor', () => {
       limit: 20,
     };
 
-    it('@Paginated() + 유효한 PaginatedResult → pagination 메타 자동 계산', async () => {
+    it('@Paginated() + 유효한 PaginatedResult → pagination 메타 자동 계산 (type: offset 포함)', async () => {
       jest.spyOn(reflector, 'get').mockImplementation((key) => {
         if (key === PAGINATED_KEY) return true;
         return undefined;
@@ -226,6 +239,7 @@ describe('SafeResponseInterceptor', () => {
 
       expect(result.data).toEqual(paginatedData.data);
       expect(result.meta?.pagination).toEqual({
+        type: 'offset',
         page: 1,
         limit: 20,
         total: 100,
@@ -694,6 +708,297 @@ describe('SafeResponseInterceptor', () => {
       );
 
       expect(result).not.toHaveProperty('code');
+    });
+  });
+
+  // ─── 요청 ID ───
+
+  describe('요청 ID (requestId)', () => {
+    it('requestId: true → UUID 자동 생성 및 응답에 포함', async () => {
+      jest.spyOn(reflector, 'get').mockReturnValue(undefined);
+      const interceptor = createInterceptor({ requestId: true });
+      const ctx = createMockExecutionContext();
+
+      const result = await lastValueFrom(
+        interceptor.intercept(ctx, createMockCallHandler({ id: 1 })),
+      );
+
+      expect(result.requestId).toBeDefined();
+      expect(typeof result.requestId).toBe('string');
+      expect(result.requestId.length).toBeGreaterThan(0);
+    });
+
+    it('requestId: true + 수신 X-Request-Id 헤더 → 해당 값 재사용', async () => {
+      jest.spyOn(reflector, 'get').mockReturnValue(undefined);
+      const interceptor = createInterceptor({ requestId: true });
+      const ctx = createMockExecutionContext({
+        headers: { 'x-request-id': 'incoming-id-123' },
+      });
+
+      const result = await lastValueFrom(
+        interceptor.intercept(ctx, createMockCallHandler({ id: 1 })),
+      );
+
+      expect(result.requestId).toBe('incoming-id-123');
+    });
+
+    it('requestId 미설정 → requestId 필드 없음', async () => {
+      jest.spyOn(reflector, 'get').mockReturnValue(undefined);
+      const interceptor = createInterceptor();
+      const ctx = createMockExecutionContext();
+
+      const result = await lastValueFrom(
+        interceptor.intercept(ctx, createMockCallHandler({ id: 1 })),
+      );
+
+      expect(result).not.toHaveProperty('requestId');
+    });
+
+    it('requestId: false → requestId 필드 없음', async () => {
+      jest.spyOn(reflector, 'get').mockReturnValue(undefined);
+      const interceptor = createInterceptor({ requestId: false });
+      const ctx = createMockExecutionContext();
+
+      const result = await lastValueFrom(
+        interceptor.intercept(ctx, createMockCallHandler({ id: 1 })),
+      );
+
+      expect(result).not.toHaveProperty('requestId');
+    });
+
+    it('requestId: { headerName: "X-Correlation-Id" } → 커스텀 헤더 사용', async () => {
+      jest.spyOn(reflector, 'get').mockReturnValue(undefined);
+      const interceptor = createInterceptor({
+        requestId: { headerName: 'X-Correlation-Id' },
+      });
+      const ctx = createMockExecutionContext({
+        headers: { 'x-correlation-id': 'corr-456' },
+      });
+
+      const result = await lastValueFrom(
+        interceptor.intercept(ctx, createMockCallHandler({ id: 1 })),
+      );
+
+      expect(result.requestId).toBe('corr-456');
+    });
+
+    it('requestId: { generator } → 커스텀 생성기 사용', async () => {
+      jest.spyOn(reflector, 'get').mockReturnValue(undefined);
+      const interceptor = createInterceptor({
+        requestId: { generator: () => 'custom-id-789' },
+      });
+      const ctx = createMockExecutionContext();
+
+      const result = await lastValueFrom(
+        interceptor.intercept(ctx, createMockCallHandler({ id: 1 })),
+      );
+
+      expect(result.requestId).toBe('custom-id-789');
+    });
+
+    it('requestId: true → 응답 헤더에 X-Request-Id 설정', async () => {
+      jest.spyOn(reflector, 'get').mockReturnValue(undefined);
+      const interceptor = createInterceptor({ requestId: true });
+      const ctx = createMockExecutionContext();
+
+      await lastValueFrom(
+        interceptor.intercept(ctx, createMockCallHandler({ id: 1 })),
+      );
+
+      const setHeaderFn = (ctx as any).__setHeaderFn;
+      expect(setHeaderFn).toHaveBeenCalledWith(
+        'X-Request-Id',
+        expect.any(String),
+      );
+    });
+
+    it('requestId: true → request에 __safeResponseRequestId 저장', async () => {
+      jest.spyOn(reflector, 'get').mockReturnValue(undefined);
+      const interceptor = createInterceptor({ requestId: true });
+      const ctx = createMockExecutionContext();
+
+      const result = await lastValueFrom(
+        interceptor.intercept(ctx, createMockCallHandler({ id: 1 })),
+      );
+
+      const mockRequest = (ctx as any).__mockRequest;
+      expect(mockRequest.__safeResponseRequestId).toBe(result.requestId);
+    });
+  });
+
+  // ─── 커서 기반 페이지네이션 ───
+
+  describe('커서 기반 페이지네이션', () => {
+    const cursorData = {
+      data: [{ id: 1 }, { id: 2 }],
+      nextCursor: 'abc123',
+      previousCursor: null,
+      hasMore: true,
+      limit: 20,
+    };
+
+    it('@CursorPaginated() + 유효한 CursorPaginatedResult → cursor pagination 메타', async () => {
+      jest.spyOn(reflector, 'get').mockImplementation((key) => {
+        if (key === CURSOR_PAGINATED_KEY) return true;
+        return undefined;
+      });
+      const interceptor = createInterceptor();
+      const ctx = createMockExecutionContext();
+
+      const result = await lastValueFrom(
+        interceptor.intercept(ctx, createMockCallHandler(cursorData)),
+      );
+
+      expect(result.data).toEqual(cursorData.data);
+      expect(result.meta?.pagination).toEqual({
+        type: 'cursor',
+        nextCursor: 'abc123',
+        previousCursor: null,
+        hasMore: true,
+        limit: 20,
+      });
+    });
+
+    it('@CursorPaginated({ maxLimit: 10 }) → limit 클램핑', async () => {
+      jest.spyOn(reflector, 'get').mockImplementation((key) => {
+        if (key === CURSOR_PAGINATED_KEY) return { maxLimit: 10 };
+        return undefined;
+      });
+      const interceptor = createInterceptor();
+      const ctx = createMockExecutionContext();
+
+      const result = await lastValueFrom(
+        interceptor.intercept(ctx, createMockCallHandler(cursorData)),
+      );
+
+      expect(result.meta?.pagination?.limit).toBe(10);
+    });
+
+    it('totalCount 포함 시 메타에 반영', async () => {
+      jest.spyOn(reflector, 'get').mockImplementation((key) => {
+        if (key === CURSOR_PAGINATED_KEY) return true;
+        return undefined;
+      });
+      const interceptor = createInterceptor();
+      const ctx = createMockExecutionContext();
+      const dataWithTotal = { ...cursorData, totalCount: 150 };
+
+      const result = await lastValueFrom(
+        interceptor.intercept(ctx, createMockCallHandler(dataWithTotal)),
+      );
+
+      expect((result.meta?.pagination as any)?.totalCount).toBe(150);
+    });
+
+    it('totalCount 미제공 시 메타에서 생략', async () => {
+      jest.spyOn(reflector, 'get').mockImplementation((key) => {
+        if (key === CURSOR_PAGINATED_KEY) return true;
+        return undefined;
+      });
+      const interceptor = createInterceptor();
+      const ctx = createMockExecutionContext();
+
+      const result = await lastValueFrom(
+        interceptor.intercept(ctx, createMockCallHandler(cursorData)),
+      );
+
+      expect(result.meta?.pagination).not.toHaveProperty('totalCount');
+    });
+
+    it('previousCursor 미제공 시 null로 기본값', async () => {
+      jest.spyOn(reflector, 'get').mockImplementation((key) => {
+        if (key === CURSOR_PAGINATED_KEY) return true;
+        return undefined;
+      });
+      const interceptor = createInterceptor();
+      const ctx = createMockExecutionContext();
+      const dataWithoutPrev = {
+        data: [{ id: 1 }],
+        nextCursor: 'abc',
+        hasMore: true,
+        limit: 10,
+      };
+
+      const result = await lastValueFrom(
+        interceptor.intercept(ctx, createMockCallHandler(dataWithoutPrev)),
+      );
+
+      expect((result.meta?.pagination as any)?.previousCursor).toBeNull();
+    });
+
+    it('@CursorPaginated() + 비-커서 데이터 → 일반 래핑', async () => {
+      jest.spyOn(reflector, 'get').mockImplementation((key) => {
+        if (key === CURSOR_PAGINATED_KEY) return true;
+        return undefined;
+      });
+      const interceptor = createInterceptor();
+      const ctx = createMockExecutionContext();
+      const nonCursorData = { name: 'not cursor' };
+
+      const result = await lastValueFrom(
+        interceptor.intercept(ctx, createMockCallHandler(nonCursorData)),
+      );
+
+      expect(result.data).toEqual(nonCursorData);
+      expect(result.meta?.pagination).toBeUndefined();
+    });
+
+    it('isCursorPaginatedResult: hasMore가 string → false', async () => {
+      jest.spyOn(reflector, 'get').mockImplementation((key) => {
+        if (key === CURSOR_PAGINATED_KEY) return true;
+        return undefined;
+      });
+      const interceptor = createInterceptor();
+      const ctx = createMockExecutionContext();
+      const badData = {
+        data: [],
+        nextCursor: 'abc',
+        hasMore: 'yes',
+        limit: 10,
+      };
+
+      const result = await lastValueFrom(
+        interceptor.intercept(ctx, createMockCallHandler(badData)),
+      );
+
+      expect(result.meta?.pagination).toBeUndefined();
+    });
+
+    it('isCursorPaginatedResult: data가 배열 아님 → false', async () => {
+      jest.spyOn(reflector, 'get').mockImplementation((key) => {
+        if (key === CURSOR_PAGINATED_KEY) return true;
+        return undefined;
+      });
+      const interceptor = createInterceptor();
+      const ctx = createMockExecutionContext();
+      const badData = {
+        data: 'not-array',
+        nextCursor: 'abc',
+        hasMore: true,
+        limit: 10,
+      };
+
+      const result = await lastValueFrom(
+        interceptor.intercept(ctx, createMockCallHandler(badData)),
+      );
+
+      expect(result.meta?.pagination).toBeUndefined();
+    });
+
+    it('isCursorPaginatedResult: null → false', async () => {
+      jest.spyOn(reflector, 'get').mockImplementation((key) => {
+        if (key === CURSOR_PAGINATED_KEY) return true;
+        return undefined;
+      });
+      const interceptor = createInterceptor();
+      const ctx = createMockExecutionContext();
+
+      const result = await lastValueFrom(
+        interceptor.intercept(ctx, createMockCallHandler(null)),
+      );
+
+      expect(result.data).toBeNull();
+      expect(result.meta?.pagination).toBeUndefined();
     });
   });
 });

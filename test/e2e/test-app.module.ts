@@ -88,6 +88,22 @@ export class TestAppSuccessCodeModule {}
 })
 export class TestAppSuccessCodePriorityModule {}
 
+@Module({
+  imports: [SafeResponseModule.register({ requestId: true })],
+  controllers: [TestController],
+})
+export class TestAppRequestIdModule {}
+
+@Module({
+  imports: [
+    SafeResponseModule.register({
+      requestId: { headerName: 'X-Correlation-Id' },
+    }),
+  ],
+  controllers: [TestController],
+})
+export class TestAppCustomRequestIdModule {}
+
 // 정상 순서: SafeResponseModule(import)이 먼저 DI에 등록 → ClassSerializer(local)가 나중
 // → ClassSerializer.map() 먼저 실행 → @Exclude() 적용 → SafeResponse.map() 래핑
 @Module({

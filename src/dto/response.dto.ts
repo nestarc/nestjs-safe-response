@@ -1,6 +1,9 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class PaginationMetaDto {
+  @ApiPropertyOptional({ example: 'offset', enum: ['offset'] })
+  type?: 'offset';
+
   @ApiProperty({ example: 1 })
   page!: number;
 
@@ -20,6 +23,26 @@ export class PaginationMetaDto {
   hasPrev!: boolean;
 }
 
+export class CursorPaginationMetaDto {
+  @ApiProperty({ example: 'cursor', enum: ['cursor'] })
+  type!: 'cursor';
+
+  @ApiProperty({ example: 'eyJpZCI6MTAwfQ==', nullable: true })
+  nextCursor!: string | null;
+
+  @ApiProperty({ example: null, nullable: true })
+  previousCursor!: string | null;
+
+  @ApiProperty({ example: true })
+  hasMore!: boolean;
+
+  @ApiProperty({ example: 20 })
+  limit!: number;
+
+  @ApiPropertyOptional({ example: 150 })
+  totalCount?: number;
+}
+
 export class ResponseMetaDto {
   @ApiPropertyOptional({ type: PaginationMetaDto })
   pagination?: PaginationMetaDto;
@@ -34,6 +57,9 @@ export class SafeSuccessResponseDto {
 
   @ApiPropertyOptional({ example: 'OK', description: 'Custom success code' })
   code?: string;
+
+  @ApiPropertyOptional({ example: '550e8400-e29b-41d4-a716-446655440000' })
+  requestId?: string;
 
   @ApiPropertyOptional({ type: ResponseMetaDto })
   meta?: ResponseMetaDto;
@@ -64,6 +90,9 @@ export class SafeErrorResponseDto {
 
   @ApiProperty({ example: 400 })
   statusCode!: number;
+
+  @ApiPropertyOptional({ example: '550e8400-e29b-41d4-a716-446655440000' })
+  requestId?: string;
 
   @ApiProperty({ type: ErrorDetailDto })
   error!: ErrorDetailDto;
