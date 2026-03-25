@@ -72,6 +72,7 @@ describe('SafeResponse E2E', () => {
 
       expect(res.body.data).toEqual([{ id: 1 }, { id: 2 }, { id: 3 }]);
       expect(res.body.meta.pagination).toEqual({
+        type: 'offset',
         page: 2,
         limit: 20,
         total: 50,

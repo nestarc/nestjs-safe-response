@@ -570,7 +570,7 @@ describe('SafeExceptionFilter', () => {
       expect(body).not.toHaveProperty('requestId');
     });
 
-    it('requestId: true → 응답 헤더에 X-Request-Id 설정', () => {
+    it('인터셉터가 저장한 ID 사용 시 중복 헤더 쓰기 스킵', () => {
       const { adapterHost } = createMockHttpAdapterHost();
       const filter = createFilter(adapterHost, { requestId: true });
       const { host, setHeaderFn } = createMockArgumentsHostWithRequestId({
@@ -579,7 +579,20 @@ describe('SafeExceptionFilter', () => {
 
       filter.catch(new BadRequestException(), host);
 
-      expect(setHeaderFn).toHaveBeenCalledWith('X-Request-Id', 'test-id');
+      // Interceptor already set the header, filter should skip
+      expect(setHeaderFn).not.toHaveBeenCalled();
+    });
+
+    it('인터셉터 미실행 시 응답 헤더 직접 설정', () => {
+      const { adapterHost } = createMockHttpAdapterHost();
+      const filter = createFilter(adapterHost, { requestId: true });
+      const { host, setHeaderFn } = createMockArgumentsHostWithRequestId({
+        headers: { 'x-request-id': 'from-header' },
+      });
+
+      filter.catch(new BadRequestException(), host);
+
+      expect(setHeaderFn).toHaveBeenCalledWith('X-Request-Id', 'from-header');
     });
   });
 });

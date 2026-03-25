@@ -116,23 +116,20 @@ export class SafeExceptionFilter implements ExceptionFilter {
     const opts = this.options.requestId;
     if (!opts) return undefined;
 
-    // Try to read ID stored by interceptor
-    let id: string | undefined = request.__safeResponseRequestId;
+    // Try to read ID stored by interceptor (already validated & header set)
+    const storedId: string | undefined = request.__safeResponseRequestId;
+    if (storedId) return storedId;
 
-    // If interceptor didn't run (e.g., error thrown before interceptor)
+    // Interceptor didn't run (e.g., error thrown before interceptor)
+    const config: RequestIdOptions = opts === true ? {} : opts;
+    const headerName = (config.headerName ?? 'X-Request-Id').toLowerCase();
+    let id = this.sanitizeRequestId(request.headers?.[headerName]);
     if (!id) {
-      const config: RequestIdOptions = opts === true ? {} : opts;
-      const headerName = (config.headerName ?? 'X-Request-Id').toLowerCase();
-      id = request.headers?.[headerName];
-      if (!id) {
-        id = (config.generator ?? (() => randomUUID()))();
-      }
+      id = (config.generator ?? (() => randomUUID()))();
     }
 
-    // Set response header
-    const headerNameOut =
-      (opts === true ? undefined : (opts as RequestIdOptions).headerName) ??
-      'X-Request-Id';
+    // Set response header (only when interceptor didn't already set it)
+    const headerNameOut = config.headerName ?? 'X-Request-Id';
     if (typeof response.setHeader === 'function') {
       response.setHeader(headerNameOut, id);
     } else if (typeof response.header === 'function') {
@@ -140,5 +137,12 @@ export class SafeExceptionFilter implements ExceptionFilter {
     }
 
     return id;
+  }
+
+  /** Validate and sanitize incoming request ID header */
+  private sanitizeRequestId(value: unknown): string | undefined {
+    if (typeof value !== 'string' || value.length === 0) return undefined;
+    const sanitized = value.slice(0, 128).replace(/[^a-zA-Z0-9\-_.~]/g, '');
+    return sanitized.length > 0 ? sanitized : undefined;
   }
 }

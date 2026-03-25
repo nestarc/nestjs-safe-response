@@ -52,6 +52,13 @@ exports[`Swagger Schema E2E API 계약 스냅샷 components/schemas가 변경되
         "example": 5,
         "type": "number",
       },
+      "type": {
+        "enum": [
+          "offset",
+        ],
+        "example": "offset",
+        "type": "string",
+      },
     },
     "required": [
       "page",
@@ -78,6 +85,10 @@ exports[`Swagger Schema E2E API 계약 스냅샷 components/schemas가 변경되
       },
       "path": {
         "example": "/api/users",
+        "type": "string",
+      },
+      "requestId": {
+        "example": "550e8400-e29b-41d4-a716-446655440000",
         "type": "string",
       },
       "statusCode": {
@@ -112,6 +123,10 @@ exports[`Swagger Schema E2E API 계약 스냅샷 components/schemas가 변경되
       },
       "path": {
         "example": "/api/users",
+        "type": "string",
+      },
+      "requestId": {
+        "example": "550e8400-e29b-41d4-a716-446655440000",
         "type": "string",
       },
       "statusCode": {

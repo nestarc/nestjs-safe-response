@@ -151,8 +151,10 @@ export class SafeResponseInterceptor implements NestInterceptor {
     const config: RequestIdOptions = opts === true ? {} : opts;
     const headerName = (config.headerName ?? 'X-Request-Id').toLowerCase();
 
-    // Check incoming header first
-    let id: string | undefined = request.headers?.[headerName];
+    // Check incoming header first (with validation)
+    let id: string | undefined = this.sanitizeRequestId(
+      request.headers?.[headerName],
+    );
     if (!id) {
       id = (config.generator ?? (() => randomUUID()))();
     }
@@ -221,6 +223,13 @@ export class SafeResponseInterceptor implements NestInterceptor {
       hasNext: result.page < totalPages,
       hasPrev: result.page > 1,
     };
+  }
+
+  /** Validate and sanitize incoming request ID header (max 128 chars, safe characters only) */
+  private sanitizeRequestId(value: unknown): string | undefined {
+    if (typeof value !== 'string' || value.length === 0) return undefined;
+    const sanitized = value.slice(0, 128).replace(/[^a-zA-Z0-9\-_.~]/g, '');
+    return sanitized.length > 0 ? sanitized : undefined;
   }
 
   private calculateCursorPagination(
