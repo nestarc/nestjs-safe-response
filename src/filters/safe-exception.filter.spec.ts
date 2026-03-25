@@ -594,5 +594,25 @@ describe('SafeExceptionFilter', () => {
 
       expect(setHeaderFn).toHaveBeenCalledWith('X-Request-Id', 'from-header');
     });
+
+    it('Fastify 어댑터: response.header() 사용', () => {
+      const { adapterHost, replyFn } = createMockHttpAdapterHost();
+      const filter = createFilter(adapterHost, { requestId: true });
+      const headerFn = jest.fn();
+      const mockRequest: Record<string, unknown> = { headers: {} };
+      const mockResponse = { header: headerFn }; // Fastify style: header() not setHeader()
+      const host = {
+        getType: () => 'http',
+        switchToHttp: () => ({
+          getRequest: () => mockRequest,
+          getResponse: () => mockResponse,
+        }),
+      } as unknown as ArgumentsHost;
+
+      filter.catch(new BadRequestException(), host);
+
+      expect(headerFn).toHaveBeenCalledWith('X-Request-Id', expect.any(String));
+      expect(replyFn.mock.calls[0][1].requestId).toBeDefined();
+    });
   });
 });

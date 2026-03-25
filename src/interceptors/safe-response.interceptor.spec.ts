@@ -36,6 +36,26 @@ function createMockExecutionContext(overrides?: {
   } as unknown as ExecutionContext;
 }
 
+/** Fastify-style mock: response has header() instead of setHeader() */
+function createFastifyMockExecutionContext(overrides?: {
+  headers?: Record<string, string>;
+}): ExecutionContext {
+  const headerFn = jest.fn();
+  const mockResponse = { statusCode: 200, header: headerFn };
+  const mockRequest = { url: '/test', headers: overrides?.headers ?? {} };
+  return {
+    getType: () => 'http',
+    getHandler: () => (() => {}),
+    getClass: () => ({}),
+    switchToHttp: () => ({
+      getRequest: () => mockRequest,
+      getResponse: () => mockResponse,
+    }),
+    __mockRequest: mockRequest,
+    __headerFn: headerFn,
+  } as unknown as ExecutionContext;
+}
+
 function createMockCallHandler(data: unknown): CallHandler {
   return { handle: () => of(data) } as CallHandler;
 }
@@ -807,6 +827,22 @@ describe('SafeResponseInterceptor', () => {
 
       const setHeaderFn = (ctx as any).__setHeaderFn;
       expect(setHeaderFn).toHaveBeenCalledWith(
+        'X-Request-Id',
+        expect.any(String),
+      );
+    });
+
+    it('requestId: true + Fastify 어댑터 → response.header() 호출', async () => {
+      jest.spyOn(reflector, 'get').mockReturnValue(undefined);
+      const interceptor = createInterceptor({ requestId: true });
+      const ctx = createFastifyMockExecutionContext();
+
+      await lastValueFrom(
+        interceptor.intercept(ctx, createMockCallHandler({ id: 1 })),
+      );
+
+      const headerFn = (ctx as any).__headerFn;
+      expect(headerFn).toHaveBeenCalledWith(
         'X-Request-Id',
         expect.any(String),
       );
