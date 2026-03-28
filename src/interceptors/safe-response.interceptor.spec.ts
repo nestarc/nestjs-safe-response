@@ -1542,4 +1542,53 @@ describe('SafeResponseInterceptor', () => {
       expect(mockRequest.__safeResponseProblemType).toBeUndefined();
     });
   });
+
+  // ─── Idempotency Guard ───
+
+  describe('중복 등록 방어 (idempotency guard)', () => {
+    it('__safeResponseWrapped가 이미 true → 래핑 스킵 (원본 반환)', async () => {
+      jest.spyOn(reflector, 'get').mockReturnValue(undefined);
+      const interceptor = createInterceptor();
+      const handler = () => {};
+      const setHeaderFn = jest.fn();
+      const mockRequest: Record<string, unknown> = {
+        url: '/test',
+        headers: {},
+        __safeResponseWrapped: true,
+      };
+      const mockResponse = { statusCode: 200, setHeader: setHeaderFn };
+      const ctx = {
+        getType: () => 'http',
+        getHandler: () => handler,
+        getClass: () => ({}),
+        switchToHttp: () => ({
+          getRequest: () => mockRequest,
+          getResponse: () => mockResponse,
+        }),
+      } as unknown as ExecutionContext;
+
+      const rawData = { id: 1, name: 'raw' };
+      const result = await lastValueFrom(
+        interceptor.intercept(ctx, createMockCallHandler(rawData)),
+      );
+
+      // Should return raw data without wrapping
+      expect(result).toEqual(rawData);
+      expect(result).not.toHaveProperty('success');
+      expect(result).not.toHaveProperty('statusCode');
+    });
+
+    it('첫 번째 호출 → __safeResponseWrapped 설정됨', async () => {
+      jest.spyOn(reflector, 'get').mockReturnValue(undefined);
+      const interceptor = createInterceptor();
+      const ctx = createMockExecutionContext();
+
+      await lastValueFrom(
+        interceptor.intercept(ctx, createMockCallHandler({ id: 1 })),
+      );
+
+      const mockRequest = (ctx as any).__mockRequest;
+      expect(mockRequest.__safeResponseWrapped).toBe(true);
+    });
+  });
 });

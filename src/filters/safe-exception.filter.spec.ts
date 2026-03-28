@@ -923,4 +923,41 @@ describe('SafeExceptionFilter', () => {
       expect(body.title).toBe('Error');
     });
   });
+
+  // ─── Idempotency Guard ───
+
+  describe('중복 등록 방어 (idempotency guard)', () => {
+    it('__safeResponseErrorHandled가 이미 true → 예외를 그대로 throw', () => {
+      const { adapterHost, replyFn } = createMockHttpAdapterHost();
+      const filter = createFilter(adapterHost);
+      const mockRequest: Record<string, unknown> = {
+        headers: {},
+        __safeResponseErrorHandled: true,
+      };
+      const mockResponse = { setHeader: jest.fn() };
+      const host = {
+        getType: () => 'http',
+        switchToHttp: () => ({
+          getRequest: () => mockRequest,
+          getResponse: () => mockResponse,
+        }),
+      } as unknown as ArgumentsHost;
+
+      const exception = new BadRequestException('test');
+      expect(() => filter.catch(exception, host)).toThrow(exception);
+      // reply should NOT have been called
+      expect(replyFn).not.toHaveBeenCalled();
+    });
+
+    it('첫 번째 호출 → __safeResponseErrorHandled 설정됨', () => {
+      const { adapterHost } = createMockHttpAdapterHost();
+      const filter = createFilter(adapterHost);
+      const host = createMockArgumentsHost();
+
+      filter.catch(new BadRequestException(), host);
+
+      const mockRequest = (host as any).switchToHttp().getRequest();
+      expect(mockRequest.__safeResponseErrorHandled).toBe(true);
+    });
+  });
 });

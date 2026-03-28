@@ -39,6 +39,12 @@ export class SafeExceptionFilter implements ExceptionFilter {
     const request = ctx.getRequest();
     const response = ctx.getResponse();
 
+    // Idempotency guard: skip if another instance already handled this error
+    if (request.__safeResponseErrorHandled) {
+      throw exception;
+    }
+    request.__safeResponseErrorHandled = true;
+
     let statusCode = 500;
     let message = 'Internal server error';
     let details: unknown = undefined;

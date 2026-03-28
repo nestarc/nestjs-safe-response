@@ -54,6 +54,14 @@ export class SafeResponseInterceptor implements NestInterceptor {
       return next.handle();
     }
 
+    // Idempotency guard: skip if another instance already marked this request
+    const httpCtxEarly = context.switchToHttp();
+    const requestEarly = httpCtxEarly.getRequest();
+    if (requestEarly.__safeResponseWrapped) {
+      return next.handle();
+    }
+    requestEarly.__safeResponseWrapped = true;
+
     const paginatedOptions = this.reflector.get<PaginatedOptions | true>(
       PAGINATED_KEY,
       context.getHandler(),

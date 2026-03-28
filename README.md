@@ -582,14 +582,14 @@ Swagger `components/schemas` and `paths` are snapshot-tested. Any unintended sch
 
 ### Performance
 
-Benchmark results (`npm run bench`, 500 iterations):
+Example benchmark results (`npm run bench`, 500 iterations, single run on one machine — your results will vary):
 
 | Path | Raw NestJS | With nestjs-safe-response | Overhead |
 |------|-----------|--------------------------|----------|
-| Success (200) | 0.54ms | 0.63ms | **+0.09ms** |
-| Error (404) | 0.70ms | 0.55ms | **-0.15ms** |
+| Success (200) | ~0.5ms | ~0.6ms | **< 0.1ms** |
+| Error (404) | ~0.7ms | ~0.6ms | **negligible** |
 
-The success path adds ~0.09ms of overhead. The error path is actually faster because `SafeExceptionFilter` uses `httpAdapter.reply()` directly, avoiding the double JSON serialization in NestJS's default exception handling.
+Response wrapping overhead is sub-millisecond. The benchmark uses supertest in a single-process setup, so absolute numbers fluctuate across environments. Run `npm run bench` in your own environment for representative results.
 
 ## Compatibility
 
