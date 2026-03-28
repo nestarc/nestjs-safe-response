@@ -5,10 +5,14 @@ import type {
   SafeProblemDetailsResponse,
   PaginationMeta,
   PaginationLinks,
+  CursorPaginationMeta,
+  CursorPaginatedResult,
+  CursorPaginatedOptions,
   ResponseMeta,
   PaginatedResult,
   PaginatedOptions,
   ProblemDetailsOptions,
+  RequestIdOptions,
   SafeResponseModuleOptions,
   SafeResponseModuleAsyncOptions,
   ApiSafeErrorResponseOptions,
@@ -159,3 +163,56 @@ const v080OptionsWithPd: SafeResponseModuleOptions = {
   problemDetails: { baseUrl: 'https://api.example.com/problems' },
 };
 expectType<SafeResponseModuleOptions>(v080OptionsWithPd);
+
+// ─── CursorPaginationMeta ───
+
+const cursorMeta: CursorPaginationMeta = {
+  type: 'cursor',
+  nextCursor: 'abc123',
+  previousCursor: null,
+  hasMore: true,
+  limit: 20,
+};
+expectType<'cursor'>(cursorMeta.type);
+expectType<string | null>(cursorMeta.nextCursor);
+expectType<boolean>(cursorMeta.hasMore);
+expectType<number | undefined>(cursorMeta.totalCount);
+
+// ─── CursorPaginatedResult ───
+
+const cursorResult: CursorPaginatedResult<{ id: number }> = {
+  data: [{ id: 1 }],
+  nextCursor: 'abc',
+  hasMore: true,
+  limit: 20,
+};
+expectType<{ id: number }[]>(cursorResult.data);
+expectType<string | null>(cursorResult.nextCursor);
+
+// ─── CursorPaginatedOptions ───
+
+const cursorOpts: CursorPaginatedOptions = { maxLimit: 100, links: true };
+expectType<number | undefined>(cursorOpts.maxLimit);
+expectType<boolean | undefined>(cursorOpts.links);
+
+// ─── RequestIdOptions ───
+
+const reqIdOpts: RequestIdOptions = {
+  headerName: 'X-Correlation-Id',
+  generator: () => 'custom-id',
+};
+expectType<string | undefined>(reqIdOpts.headerName);
+expectType<(() => string) | undefined>(reqIdOpts.generator);
+
+// ─── SafeResponseModuleAsyncOptions ───
+
+const asyncOpts: SafeResponseModuleAsyncOptions = {
+  useFactory: () => ({ timestamp: false }),
+};
+expectType<SafeResponseModuleAsyncOptions>(asyncOpts);
+
+const asyncOptsWithInject: SafeResponseModuleAsyncOptions = {
+  useFactory: async (config: any) => ({ path: config.path }),
+  inject: ['CONFIG'],
+};
+expectType<SafeResponseModuleAsyncOptions>(asyncOptsWithInject);

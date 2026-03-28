@@ -12,6 +12,7 @@ import {
   CursorPaginated,
   ResponseMessage,
   SuccessCode,
+  ProblemType,
 } from '../../src/decorators';
 import { Exclude } from 'class-transformer';
 
@@ -147,6 +148,12 @@ export class TestController {
       hasMore: true,
       limit: 20,
     };
+  }
+
+  @Get('problem-typed')
+  @ProblemType('https://api.example.com/problems/user-not-found')
+  problemTyped() {
+    throw new NotFoundException('User not found');
   }
 
   @Get('edge-undefined')

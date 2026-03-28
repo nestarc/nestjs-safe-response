@@ -887,6 +887,68 @@ describe('SafeResponseInterceptor', () => {
       const mockRequest = (ctx as any).__mockRequest;
       expect(mockRequest.__safeResponseRequestId).toBe(result.requestId);
     });
+
+    it('requestId: true + 헤더값이 모든 문자 무효 → 새 ID 생성', async () => {
+      jest.spyOn(reflector, 'get').mockReturnValue(undefined);
+      const interceptor = createInterceptor({ requestId: true });
+      const ctx = createMockExecutionContext({
+        headers: { 'x-request-id': '<script>alert(1)</script>' },
+      });
+
+      const result = await lastValueFrom(
+        interceptor.intercept(ctx, createMockCallHandler({ id: 1 })),
+      );
+
+      // Sanitized to 'scriptalert1script' (only safe chars kept)
+      expect(result.requestId).toBeDefined();
+      expect(result.requestId).not.toContain('<');
+      expect(result.requestId).not.toContain('>');
+    });
+
+    it('requestId: true + 헤더값 빈 문자열 → 새 ID 생성', async () => {
+      jest.spyOn(reflector, 'get').mockReturnValue(undefined);
+      const interceptor = createInterceptor({ requestId: true });
+      const ctx = createMockExecutionContext({
+        headers: { 'x-request-id': '' },
+      });
+
+      const result = await lastValueFrom(
+        interceptor.intercept(ctx, createMockCallHandler({ id: 1 })),
+      );
+
+      expect(result.requestId).toBeDefined();
+      expect(result.requestId!.length).toBeGreaterThan(0);
+    });
+
+    it('requestId: true + 헤더값 129자 → 128자로 잘림', async () => {
+      jest.spyOn(reflector, 'get').mockReturnValue(undefined);
+      const interceptor = createInterceptor({ requestId: true });
+      const longId = 'a'.repeat(129);
+      const ctx = createMockExecutionContext({
+        headers: { 'x-request-id': longId },
+      });
+
+      const result = await lastValueFrom(
+        interceptor.intercept(ctx, createMockCallHandler({ id: 1 })),
+      );
+
+      expect(result.requestId).toBe('a'.repeat(128));
+    });
+
+    it('requestId: true + 헤더값 정확히 128자 → 그대로 사용', async () => {
+      jest.spyOn(reflector, 'get').mockReturnValue(undefined);
+      const interceptor = createInterceptor({ requestId: true });
+      const exactId = 'b'.repeat(128);
+      const ctx = createMockExecutionContext({
+        headers: { 'x-request-id': exactId },
+      });
+
+      const result = await lastValueFrom(
+        interceptor.intercept(ctx, createMockCallHandler({ id: 1 })),
+      );
+
+      expect(result.requestId).toBe(exactId);
+    });
   });
 
   // ─── 커서 기반 페이지네이션 ───
@@ -1311,6 +1373,35 @@ describe('SafeResponseInterceptor', () => {
 
         expect((result.meta?.pagination as any)?.links).toBeUndefined();
       });
+
+      it('기존 쿼리 파라미터가 커서 링크에 보존됨', async () => {
+        jest.spyOn(reflector, 'get').mockImplementation((key) => {
+          if (key === CURSOR_PAGINATED_KEY) return { links: true };
+          return undefined;
+        });
+        const interceptor = createInterceptor();
+        const ctx = createMockExecutionContext({
+          url: '/api/feed?filter=active&limit=20',
+        });
+        const data = {
+          data: [{ id: 1 }],
+          nextCursor: 'next-token',
+          previousCursor: null,
+          hasMore: true,
+          limit: 20,
+        };
+
+        const result = await lastValueFrom(
+          interceptor.intercept(ctx, createMockCallHandler(data)),
+        );
+
+        const links = (result.meta?.pagination as any)?.links;
+        expect(links.next).toContain('filter=active');
+        expect(links.next).toContain('cursor=next-token');
+        expect(links.first).toContain('filter=active');
+        expect(links.first).not.toContain('cursor=');
+        expect(links.self).toContain('filter=active');
+      });
     });
   });
 
@@ -1403,7 +1494,7 @@ describe('SafeResponseInterceptor', () => {
 
     it('responseTime: true + @RawResponse() → 래핑 스킵 시 startTime 저장 안 함', async () => {
       jest.spyOn(reflector, 'get').mockImplementation((key) => {
-        if (key === 'RAW_RESPONSE') return true;
+        if (key === RAW_RESPONSE_KEY) return true;
         return undefined;
       });
       const interceptor = createInterceptor({ responseTime: true });

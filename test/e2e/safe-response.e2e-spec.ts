@@ -620,5 +620,16 @@ describe('SafeResponse E2E', () => {
       expect(res.body.data).toBeDefined();
       expect(res.body).not.toHaveProperty('type');
     });
+
+    it('@ProblemType() → 커스텀 type URI 반영', async () => {
+      app = await createApp(TestAppProblemDetailsModule);
+      const res = await request(app.getHttpServer())
+        .get('/test/problem-typed')
+        .expect(404);
+
+      expect(res.body.type).toBe('https://api.example.com/problems/user-not-found');
+      expect(res.body.title).toBe('Not Found');
+      expect(res.body.detail).toBe('User not found');
+    });
   });
 });

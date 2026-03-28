@@ -154,4 +154,15 @@ describe('SafeResponse E2E (Fastify)', () => {
 
     expect(res.headers['content-type']).toContain('application/problem+json');
   });
+
+  it('@ProblemType() → Fastify에서 커스텀 type URI 반영', async () => {
+    app = await createFastifyApp(TestAppProblemDetailsModule);
+    const res = await request(app.getHttpServer())
+      .get('/test/problem-typed')
+      .expect(404);
+
+    expect(res.body.type).toBe('https://api.example.com/problems/user-not-found');
+    expect(res.body.title).toBe('Not Found');
+    expect(res.body.detail).toBe('User not found');
+  });
 });
