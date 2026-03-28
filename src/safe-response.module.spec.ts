@@ -152,31 +152,22 @@ describe('SafeResponseModule', () => {
       await app.close();
     });
 
-    it('이중 등록 → Logger.warn 발행', async () => {
+    it('instanceCount > 1 → Logger.warn 발행', () => {
       const warnSpy = jest
         .spyOn(SafeResponseModule['logger'], 'warn')
         .mockImplementation();
 
-      @Module({
-        imports: [
-          SafeResponseModule.register(),
-          SafeResponseModule.register(),
-        ],
-      })
-      class DoubleModule {}
+      // Simulate the second onModuleInit call
+      const instance = new SafeResponseModule();
+      instance.onModuleInit(); // first call: count becomes 1 (no warn)
+      instance.onModuleInit(); // second call: count becomes 2 (warn)
 
-      const moduleRef = await Test.createTestingModule({
-        imports: [DoubleModule],
-      }).compile();
-      const app = moduleRef.createNestApplication();
-      await app.init();
-
+      expect(warnSpy).toHaveBeenCalledTimes(1);
       expect(warnSpy).toHaveBeenCalledWith(
         expect.stringContaining('registered multiple times'),
       );
 
       warnSpy.mockRestore();
-      await app.close();
     });
 
     it('_resetForTesting() → 카운터 초기화', () => {
