@@ -6,9 +6,10 @@ import {
   NestInterceptor,
   Optional,
 } from '@nestjs/common';
-import { Reflector } from '@nestjs/core';
+import { ModuleRef, Reflector } from '@nestjs/core';
 import { Observable, map } from 'rxjs';
 import { randomUUID } from 'node:crypto';
+import { I18nAdapter, NestI18nAdapter } from '../adapters/i18n.adapter';
 import {
   SAFE_RESPONSE_OPTIONS,
   RAW_RESPONSE_KEY,
@@ -17,6 +18,8 @@ import {
   RESPONSE_MESSAGE_KEY,
   SUCCESS_CODE_KEY,
   PROBLEM_TYPE_KEY,
+  SORT_META_KEY,
+  FILTER_META_KEY,
 } from '../constants';
 import {
   SafeResponseModuleOptions,
@@ -33,12 +36,85 @@ import {
 
 @Injectable()
 export class SafeResponseInterceptor implements NestInterceptor {
+  private _clsService: any = undefined; // undefined=not resolved, null=unavailable
+  private _i18nAdapter: I18nAdapter | null | undefined = undefined;
+
   constructor(
     private readonly reflector: Reflector,
     @Optional()
     @Inject(SAFE_RESPONSE_OPTIONS)
     private readonly options: SafeResponseModuleOptions = {},
+    @Optional()
+    private readonly moduleRef?: ModuleRef,
   ) {}
+
+  private resolveClsService(): any {
+    if (this._clsService === undefined) {
+      if (!this.options.context || !this.moduleRef) {
+        this._clsService = null;
+        return null;
+      }
+      try {
+        const { ClsService } = require('nestjs-cls');
+        this._clsService = this.moduleRef.get(ClsService, { strict: false }) ?? null;
+      } catch {
+        this._clsService = null;
+      }
+    }
+    return this._clsService;
+  }
+
+  private resolveI18nAdapter(): I18nAdapter | null {
+    if (this._i18nAdapter === undefined) {
+      if (!this.options.i18n) {
+        this._i18nAdapter = null;
+      } else if (typeof this.options.i18n === 'object') {
+        this._i18nAdapter = this.options.i18n;
+      } else if (this.options.i18n === true && this.moduleRef) {
+        try {
+          const { I18nService } = require('nestjs-i18n');
+          const service = this.moduleRef.get(I18nService, { strict: false });
+          this._i18nAdapter = service ? new NestI18nAdapter(service) : null;
+        } catch {
+          this._i18nAdapter = null;
+        }
+      } else {
+        this._i18nAdapter = null;
+      }
+    }
+    return this._i18nAdapter;
+  }
+
+  private resolveContextMeta(request: any): Record<string, unknown> | undefined {
+    const contextOpts = this.options.context;
+    if (!contextOpts) return undefined;
+
+    const clsService = this.resolveClsService();
+    if (!clsService) return undefined;
+
+    if (contextOpts.resolver) {
+      try {
+        return contextOpts.resolver(clsService);
+      } catch {
+        return undefined;
+      }
+    }
+
+    if (contextOpts.fields) {
+      const result: Record<string, unknown> = {};
+      let hasValue = false;
+      for (const [metaField, clsKey] of Object.entries(contextOpts.fields)) {
+        const value = clsService.get(clsKey);
+        if (value !== undefined && value !== null) {
+          result[metaField] = value;
+          hasValue = true;
+        }
+      }
+      return hasValue ? result : undefined;
+    }
+
+    return undefined;
+  }
 
   intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
     if (context.getType() !== 'http') {
@@ -165,8 +241,30 @@ export class SafeResponseInterceptor implements NestInterceptor {
           response.meta = { pagination };
         }
 
+        // Sort/Filter metadata — include if decorators are present and data provides them
+        const includeSortMeta = this.reflector.get<boolean>(SORT_META_KEY, context.getHandler());
+        const includeFilterMeta = this.reflector.get<boolean>(FILTER_META_KEY, context.getHandler());
+
+        if (includeSortMeta && data && typeof data === 'object' && 'sort' in data && data.sort) {
+          response.meta = { ...response.meta, sort: data.sort };
+        }
+        if (includeFilterMeta && data && typeof data === 'object' && 'filters' in data && data.filters) {
+          response.meta = { ...response.meta, filters: data.filters };
+        }
+
         if (customMessage) {
-          response.meta = { ...response.meta, message: customMessage };
+          // Translate message if i18n is enabled
+          const i18nAdapter = this.resolveI18nAdapter();
+          const message = i18nAdapter
+            ? i18nAdapter.translate(customMessage, { lang: i18nAdapter.resolveLanguage(request) })
+            : customMessage;
+          response.meta = { ...response.meta, message };
+        }
+
+        // Inject CLS context fields into meta
+        const contextMeta = this.resolveContextMeta(request);
+        if (contextMeta) {
+          response.meta = { ...response.meta, ...contextMeta };
         }
 
         const includeTimestamp = this.options.timestamp ?? true;

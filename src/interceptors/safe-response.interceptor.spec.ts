@@ -2,7 +2,7 @@ import { CallHandler, ExecutionContext } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { of, lastValueFrom } from 'rxjs';
 import { SafeResponseInterceptor } from './safe-response.interceptor';
-import { RAW_RESPONSE_KEY, PAGINATED_KEY, CURSOR_PAGINATED_KEY, RESPONSE_MESSAGE_KEY, SUCCESS_CODE_KEY, PROBLEM_TYPE_KEY } from '../constants';
+import { RAW_RESPONSE_KEY, PAGINATED_KEY, CURSOR_PAGINATED_KEY, RESPONSE_MESSAGE_KEY, SUCCESS_CODE_KEY, PROBLEM_TYPE_KEY, SORT_META_KEY, FILTER_META_KEY } from '../constants';
 import { SafeResponseModuleOptions } from '../interfaces';
 
 function createMockExecutionContext(overrides?: {
@@ -63,8 +63,8 @@ function createMockCallHandler(data: unknown): CallHandler {
 describe('SafeResponseInterceptor', () => {
   let reflector: Reflector;
 
-  function createInterceptor(options: SafeResponseModuleOptions = {}) {
-    return new SafeResponseInterceptor(reflector, options);
+  function createInterceptor(options: SafeResponseModuleOptions = {}, moduleRef?: any) {
+    return new SafeResponseInterceptor(reflector, options, moduleRef);
   }
 
   beforeEach(() => {
@@ -1589,6 +1589,327 @@ describe('SafeResponseInterceptor', () => {
 
       const mockRequest = (ctx as any).__mockRequest;
       expect(mockRequest.__safeResponseWrapped).toBe(true);
+    });
+  });
+
+  // ─── Sort/Filter Metadata ───
+
+  describe('Sort/Filter 메타데이터', () => {
+    it('@SortMeta() 데코레이터가 있고 데이터에 sort가 있으면 meta.sort에 포함', async () => {
+      jest.spyOn(reflector, 'get').mockImplementation((key) => {
+        if (key === SORT_META_KEY) return true;
+        if (key === PAGINATED_KEY) return true;
+        return undefined;
+      });
+      const interceptor = createInterceptor();
+      const ctx = createMockExecutionContext();
+      const data = {
+        data: [{ id: 1 }],
+        total: 1,
+        page: 1,
+        limit: 20,
+        sort: { field: 'createdAt', order: 'desc' },
+      };
+
+      const result = await lastValueFrom(
+        interceptor.intercept(ctx, createMockCallHandler(data)),
+      );
+
+      expect(result.meta.sort).toEqual({ field: 'createdAt', order: 'desc' });
+    });
+
+    it('@FilterMeta() 데코레이터가 있고 데이터에 filters가 있으면 meta.filters에 포함', async () => {
+      jest.spyOn(reflector, 'get').mockImplementation((key) => {
+        if (key === FILTER_META_KEY) return true;
+        if (key === PAGINATED_KEY) return true;
+        return undefined;
+      });
+      const interceptor = createInterceptor();
+      const ctx = createMockExecutionContext();
+      const data = {
+        data: [{ id: 1 }],
+        total: 1,
+        page: 1,
+        limit: 20,
+        filters: { status: 'active', role: 'admin' },
+      };
+
+      const result = await lastValueFrom(
+        interceptor.intercept(ctx, createMockCallHandler(data)),
+      );
+
+      expect(result.meta.filters).toEqual({ status: 'active', role: 'admin' });
+    });
+
+    it('@SortMeta() 데코레이터가 없으면 sort가 있어도 meta에 포함하지 않음', async () => {
+      jest.spyOn(reflector, 'get').mockImplementation((key) => {
+        if (key === PAGINATED_KEY) return true;
+        return undefined;
+      });
+      const interceptor = createInterceptor();
+      const ctx = createMockExecutionContext();
+      const data = {
+        data: [{ id: 1 }],
+        total: 1,
+        page: 1,
+        limit: 20,
+        sort: { field: 'createdAt', order: 'desc' },
+      };
+
+      const result = await lastValueFrom(
+        interceptor.intercept(ctx, createMockCallHandler(data)),
+      );
+
+      expect(result.meta.sort).toBeUndefined();
+    });
+
+    it('@FilterMeta() 데코레이터가 없으면 filters가 있어도 meta에 포함하지 않음', async () => {
+      jest.spyOn(reflector, 'get').mockImplementation((key) => {
+        if (key === PAGINATED_KEY) return true;
+        return undefined;
+      });
+      const interceptor = createInterceptor();
+      const ctx = createMockExecutionContext();
+      const data = {
+        data: [{ id: 1 }],
+        total: 1,
+        page: 1,
+        limit: 20,
+        filters: { status: 'active' },
+      };
+
+      const result = await lastValueFrom(
+        interceptor.intercept(ctx, createMockCallHandler(data)),
+      );
+
+      expect(result.meta.filters).toBeUndefined();
+    });
+
+    it('@SortMeta() 데코레이터가 있지만 데이터에 sort가 없으면 meta.sort 없음', async () => {
+      jest.spyOn(reflector, 'get').mockImplementation((key) => {
+        if (key === SORT_META_KEY) return true;
+        return undefined;
+      });
+      const interceptor = createInterceptor();
+      const ctx = createMockExecutionContext();
+
+      const result = await lastValueFrom(
+        interceptor.intercept(ctx, createMockCallHandler({ id: 1 })),
+      );
+
+      expect(result.meta?.sort).toBeUndefined();
+    });
+
+    it('Sort와 Filter를 동시에 사용할 수 있음', async () => {
+      jest.spyOn(reflector, 'get').mockImplementation((key) => {
+        if (key === SORT_META_KEY) return true;
+        if (key === FILTER_META_KEY) return true;
+        if (key === PAGINATED_KEY) return true;
+        return undefined;
+      });
+      const interceptor = createInterceptor();
+      const ctx = createMockExecutionContext();
+      const data = {
+        data: [{ id: 1 }],
+        total: 1,
+        page: 1,
+        limit: 20,
+        sort: { field: 'name', order: 'asc' },
+        filters: { category: 'electronics' },
+      };
+
+      const result = await lastValueFrom(
+        interceptor.intercept(ctx, createMockCallHandler(data)),
+      );
+
+      expect(result.meta.sort).toEqual({ field: 'name', order: 'asc' });
+      expect(result.meta.filters).toEqual({ category: 'electronics' });
+      expect(result.meta.pagination).toBeDefined();
+    });
+
+    it('커서 페이지네이션과 Sort/Filter를 함께 사용할 수 있음', async () => {
+      jest.spyOn(reflector, 'get').mockImplementation((key) => {
+        if (key === SORT_META_KEY) return true;
+        if (key === FILTER_META_KEY) return true;
+        if (key === CURSOR_PAGINATED_KEY) return true;
+        return undefined;
+      });
+      const interceptor = createInterceptor();
+      const ctx = createMockExecutionContext();
+      const data = {
+        data: [{ id: 1 }],
+        nextCursor: 'abc',
+        hasMore: true,
+        limit: 20,
+        sort: { field: 'id', order: 'desc' },
+        filters: { status: 'published' },
+      };
+
+      const result = await lastValueFrom(
+        interceptor.intercept(ctx, createMockCallHandler(data)),
+      );
+
+      expect(result.meta.sort).toEqual({ field: 'id', order: 'desc' });
+      expect(result.meta.filters).toEqual({ status: 'published' });
+      expect(result.meta.pagination.type).toBe('cursor');
+    });
+
+    it('비페이지네이션 응답에서도 Sort/Filter 메타데이터 가능', async () => {
+      jest.spyOn(reflector, 'get').mockImplementation((key) => {
+        if (key === SORT_META_KEY) return true;
+        if (key === FILTER_META_KEY) return true;
+        return undefined;
+      });
+      const interceptor = createInterceptor();
+      const ctx = createMockExecutionContext();
+      const data = {
+        items: [{ id: 1 }],
+        sort: { field: 'createdAt', order: 'desc' },
+        filters: { active: true },
+      };
+
+      const result = await lastValueFrom(
+        interceptor.intercept(ctx, createMockCallHandler(data)),
+      );
+
+      expect(result.meta.sort).toEqual({ field: 'createdAt', order: 'desc' });
+      expect(result.meta.filters).toEqual({ active: true });
+    });
+
+    it('null 데이터에서 Sort/Filter 안전하게 무시', async () => {
+      jest.spyOn(reflector, 'get').mockImplementation((key) => {
+        if (key === SORT_META_KEY) return true;
+        if (key === FILTER_META_KEY) return true;
+        return undefined;
+      });
+      const interceptor = createInterceptor();
+      const ctx = createMockExecutionContext();
+
+      const result = await lastValueFrom(
+        interceptor.intercept(ctx, createMockCallHandler(null)),
+      );
+
+      expect(result.meta?.sort).toBeUndefined();
+      expect(result.meta?.filters).toBeUndefined();
+    });
+  });
+
+  // ─── CLS Context Integration ───
+
+  describe('CLS 컨텍스트 연동', () => {
+    it('context.fields가 설정되면 CLS 값을 meta에 주입', async () => {
+      const mockClsService = { get: jest.fn((key: string) => key === 'traceId' ? 'trace-abc' : undefined) };
+      const mockModuleRef = {
+        get: jest.fn(() => mockClsService),
+      };
+
+      // Mock nestjs-cls require
+      jest.mock('nestjs-cls', () => ({ ClsService: class {} }), { virtual: true });
+
+      jest.spyOn(reflector, 'get').mockReturnValue(undefined);
+      const interceptor = createInterceptor(
+        { context: { fields: { traceId: 'traceId' } } },
+        mockModuleRef,
+      );
+
+      const ctx = createMockExecutionContext();
+      const result = await lastValueFrom(
+        interceptor.intercept(ctx, createMockCallHandler({ id: 1 })),
+      );
+
+      expect(result.meta?.traceId).toBe('trace-abc');
+
+      jest.restoreAllMocks();
+    });
+
+    it('context.resolver가 설정되면 커스텀 함수로 meta 주입', async () => {
+      const mockClsService = { get: jest.fn() };
+      const mockModuleRef = { get: jest.fn(() => mockClsService) };
+      jest.mock('nestjs-cls', () => ({ ClsService: class {} }), { virtual: true });
+
+      jest.spyOn(reflector, 'get').mockReturnValue(undefined);
+      const interceptor = createInterceptor(
+        {
+          context: {
+            resolver: (cls: any) => ({ custom: 'value', fromCls: true }),
+          },
+        },
+        mockModuleRef,
+      );
+
+      const ctx = createMockExecutionContext();
+      const result = await lastValueFrom(
+        interceptor.intercept(ctx, createMockCallHandler({ id: 1 })),
+      );
+
+      expect(result.meta?.custom).toBe('value');
+      expect(result.meta?.fromCls).toBe(true);
+
+      jest.restoreAllMocks();
+    });
+
+    it('context 옵션이 없으면 CLS 값을 주입하지 않음', async () => {
+      jest.spyOn(reflector, 'get').mockReturnValue(undefined);
+      const interceptor = createInterceptor({});
+
+      const ctx = createMockExecutionContext();
+      const result = await lastValueFrom(
+        interceptor.intercept(ctx, createMockCallHandler({ id: 1 })),
+      );
+
+      expect(result.meta).toBeUndefined();
+    });
+  });
+
+  // ─── i18n Message Translation ───
+
+  describe('i18n 메시지 번역', () => {
+    it('i18n 어댑터가 있으면 @ResponseMessage 값을 번역', async () => {
+      const mockAdapter = {
+        translate: jest.fn((key: string) => key === 'messages.FETCHED' ? '조회 성공' : key),
+        resolveLanguage: jest.fn(() => 'ko'),
+      };
+
+      jest.spyOn(reflector, 'get').mockImplementation((key) => {
+        if (key === RESPONSE_MESSAGE_KEY) return 'messages.FETCHED';
+        return undefined;
+      });
+
+      const interceptor = createInterceptor({ i18n: mockAdapter });
+      const ctx = createMockExecutionContext();
+      const result = await lastValueFrom(
+        interceptor.intercept(ctx, createMockCallHandler({ id: 1 })),
+      );
+
+      expect(result.meta?.message).toBe('조회 성공');
+      expect(mockAdapter.translate).toHaveBeenCalledWith('messages.FETCHED', { lang: 'ko' });
+    });
+
+    it('i18n이 false이면 @ResponseMessage 원본 유지', async () => {
+      jest.spyOn(reflector, 'get').mockImplementation((key) => {
+        if (key === RESPONSE_MESSAGE_KEY) return 'Original message';
+        return undefined;
+      });
+
+      const interceptor = createInterceptor({ i18n: false });
+      const ctx = createMockExecutionContext();
+      const result = await lastValueFrom(
+        interceptor.intercept(ctx, createMockCallHandler({ id: 1 })),
+      );
+
+      expect(result.meta?.message).toBe('Original message');
+    });
+
+    it('i18n 어댑터 없이 @ResponseMessage가 없으면 meta.message 없음', async () => {
+      jest.spyOn(reflector, 'get').mockReturnValue(undefined);
+      const interceptor = createInterceptor({});
+
+      const ctx = createMockExecutionContext();
+      const result = await lastValueFrom(
+        interceptor.intercept(ctx, createMockCallHandler({ id: 1 })),
+      );
+
+      expect(result.meta?.message).toBeUndefined();
     });
   });
 });

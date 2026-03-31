@@ -216,3 +216,64 @@ const asyncOptsWithInject: SafeResponseModuleAsyncOptions = {
   inject: ['CONFIG'],
 };
 expectType<SafeResponseModuleAsyncOptions>(asyncOptsWithInject);
+
+// ─── Client Types ────────────────────────────────────────────────────
+import type {
+  SafeSuccessResponse as ClientSuccess,
+  SafeErrorResponse as ClientError,
+  SafeResponse as ClientResponse,
+  SafeProblemDetailsResponse as ClientProblem,
+  PaginationMeta as ClientPaginationMeta,
+  CursorPaginationMeta as ClientCursorMeta,
+  PaginationLinks as ClientLinks,
+  ResponseMeta as ClientMeta,
+  SortInfo as ClientSort,
+} from './dist/client';
+
+// Client SafeSuccessResponse should have data field
+const clientSuccess: ClientSuccess<{ id: number }> = {
+  success: true,
+  statusCode: 200,
+  data: { id: 1 },
+};
+expectType<true>(clientSuccess.success);
+expectType<{ id: number }>(clientSuccess.data);
+
+// Client SafeErrorResponse should have error field
+const clientError: ClientError = {
+  success: false,
+  statusCode: 400,
+  error: { code: 'BAD_REQUEST', message: 'Bad' },
+};
+expectType<false>(clientError.success);
+expectType<string>(clientError.error.code);
+
+// Client SafeResponse union should accept both
+expectAssignable<ClientResponse>(clientSuccess);
+expectAssignable<ClientResponse>(clientError);
+
+// Client PaginationMeta
+const clientPagination: ClientPaginationMeta = {
+  page: 1, limit: 20, total: 100, totalPages: 5,
+  hasNext: true, hasPrev: false,
+};
+expectType<number>(clientPagination.page);
+
+// Client CursorPaginationMeta
+const clientCursor: ClientCursorMeta = {
+  type: 'cursor', nextCursor: 'abc', previousCursor: null,
+  hasMore: true, limit: 20,
+};
+expectType<'cursor'>(clientCursor.type);
+
+// Client ResponseMeta should accept index signature
+const clientMeta: ClientMeta = {
+  responseTime: 42,
+  traceId: 'custom-field',
+};
+expectAssignable<ClientMeta>(clientMeta);
+
+// Client SortInfo
+const clientSort: ClientSort = { field: 'createdAt', order: 'desc' };
+expectType<string>(clientSort.field);
+expectAssignable<'asc' | 'desc'>(clientSort.order);

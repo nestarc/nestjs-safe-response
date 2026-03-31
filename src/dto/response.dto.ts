@@ -66,6 +66,24 @@ export class CursorPaginationMetaDto {
   links?: PaginationLinksDto;
 }
 
+export class SortMetaDto {
+  @ApiProperty({ example: 'createdAt', description: 'Sort field name' })
+  field!: string;
+
+  @ApiProperty({ example: 'desc', enum: ['asc', 'desc'], description: 'Sort order' })
+  order!: 'asc' | 'desc';
+}
+
+export class FilterMetaDto {
+  @ApiProperty({
+    example: { status: 'active', role: 'admin' },
+    description: 'Applied filter criteria',
+    type: 'object',
+    additionalProperties: true,
+  })
+  filters!: Record<string, unknown>;
+}
+
 @ApiExtraModels(PaginationMetaDto, CursorPaginationMetaDto)
 export class ResponseMetaDto {
   @ApiPropertyOptional({
@@ -81,6 +99,12 @@ export class ResponseMetaDto {
 
   @ApiPropertyOptional({ example: 42, description: 'Response time in milliseconds' })
   responseTime?: number;
+
+  @ApiPropertyOptional({ type: SortMetaDto, description: 'Applied sort criteria' })
+  sort?: SortMetaDto;
+
+  @ApiPropertyOptional({ example: { status: 'active' }, description: 'Applied filters' })
+  filters?: Record<string, unknown>;
 }
 
 export class SafeSuccessResponseDto {

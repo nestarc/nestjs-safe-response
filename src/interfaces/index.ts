@@ -7,6 +7,20 @@ export interface RequestIdOptions {
   generator?: () => string;
 }
 
+export interface ContextOptions {
+  /** Map CLS store keys to response meta fields. Key = meta field name, Value = CLS store key. */
+  fields?: Record<string, string>;
+  /** Custom resolver function. Receives the CLS service instance and returns fields to inject. */
+  resolver?: (store: unknown) => Record<string, unknown>;
+}
+
+export { I18nAdapter } from '../adapters/i18n.adapter';
+
+export interface SwaggerOptions {
+  /** Error responses to add to all routes (e.g., [401, 403, 500]) */
+  globalErrors?: ApiSafeErrorResponseConfig[];
+}
+
 export interface SafeResponseModuleOptions {
   /** Include timestamp field in responses (default: true) */
   timestamp?: boolean;
@@ -26,6 +40,12 @@ export interface SafeResponseModuleOptions {
   responseTime?: boolean;
   /** Enable RFC 9457 Problem Details format for error responses. Default: false */
   problemDetails?: boolean | ProblemDetailsOptions;
+  /** Swagger documentation options */
+  swagger?: SwaggerOptions;
+  /** Inject request context values (e.g., traceId) into response meta. Requires nestjs-cls. */
+  context?: ContextOptions;
+  /** Enable i18n for error/success messages. true = auto-detect nestjs-i18n, or pass a custom I18nAdapter. */
+  i18n?: boolean | import('../adapters/i18n.adapter').I18nAdapter;
 }
 
 export interface ProblemDetailsOptions {
@@ -80,10 +100,19 @@ export interface CursorPaginationMeta {
   links?: PaginationLinks;
 }
 
+export interface SortInfo {
+  field: string;
+  order: 'asc' | 'desc';
+}
+
 export interface ResponseMeta {
   pagination?: PaginationMeta | CursorPaginationMeta;
   message?: string;
   responseTime?: number;
+  sort?: SortInfo;
+  filters?: Record<string, unknown>;
+  /** Additional context fields (e.g., traceId, correlationId) */
+  [key: string]: unknown;
 }
 
 export interface SafeSuccessResponse<T = unknown> {

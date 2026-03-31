@@ -1,11 +1,12 @@
 import { applyDecorators, SetMetadata, Type } from '@nestjs/common';
 import {
   ApiExtraModels,
+  ApiExtension,
   ApiOkResponse,
   ApiResponse,
   getSchemaPath,
 } from '@nestjs/swagger';
-import { RAW_RESPONSE_KEY, PAGINATED_KEY, RESPONSE_MESSAGE_KEY, SUCCESS_CODE_KEY, CURSOR_PAGINATED_KEY, PROBLEM_TYPE_KEY } from '../constants';
+import { RAW_RESPONSE_KEY, PAGINATED_KEY, RESPONSE_MESSAGE_KEY, SUCCESS_CODE_KEY, CURSOR_PAGINATED_KEY, PROBLEM_TYPE_KEY, SORT_META_KEY, FILTER_META_KEY, SKIP_GLOBAL_ERRORS_KEY } from '../constants';
 import {
   SafeSuccessResponseDto,
   SafeErrorResponseDto,
@@ -282,6 +283,28 @@ export const SuccessCode = (code: string) => SetMetadata(SUCCESS_CODE_KEY, code)
  */
 export const ProblemType = (typeUri: string) =>
   SetMetadata(PROBLEM_TYPE_KEY, typeUri);
+
+/**
+ * Include sort metadata in the response meta.
+ * The handler must return a `sort` field in the paginated result.
+ */
+export const SortMeta = () => SetMetadata(SORT_META_KEY, true);
+
+/**
+ * Include filter metadata in the response meta.
+ * The handler must return a `filters` field in the paginated result.
+ */
+export const FilterMeta = () => SetMetadata(FILTER_META_KEY, true);
+
+/**
+ * Skip global error responses for this route.
+ * Use on health checks, public endpoints, etc. that should not inherit global error documentation.
+ */
+export const SkipGlobalErrors = () =>
+  applyDecorators(
+    SetMetadata(SKIP_GLOBAL_ERRORS_KEY, true),
+    ApiExtension('x-skip-global-errors', true),
+  );
 
 /**
  * Document an RFC 9457 Problem Details error response in Swagger.

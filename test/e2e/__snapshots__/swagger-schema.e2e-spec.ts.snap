@@ -226,6 +226,13 @@ exports[`Swagger Schema E2E API 계약 스냅샷 components/schemas가 변경되
   },
   "ResponseMetaDto": {
     "properties": {
+      "filters": {
+        "description": "Applied filters",
+        "example": {
+          "status": "active",
+        },
+        "type": "object",
+      },
       "message": {
         "description": "Custom response message",
         "example": "Users fetched successfully",
@@ -245,6 +252,14 @@ exports[`Swagger Schema E2E API 계약 스냅샷 components/schemas가 변경되
         "description": "Response time in milliseconds",
         "example": 42,
         "type": "number",
+      },
+      "sort": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/SortMetaDto",
+          },
+        ],
+        "description": "Applied sort criteria",
       },
     },
     "type": "object",
@@ -319,6 +334,29 @@ exports[`Swagger Schema E2E API 계약 스냅샷 components/schemas가 변경되
     "required": [
       "success",
       "statusCode",
+    ],
+    "type": "object",
+  },
+  "SortMetaDto": {
+    "properties": {
+      "field": {
+        "description": "Sort field name",
+        "example": "createdAt",
+        "type": "string",
+      },
+      "order": {
+        "description": "Sort order",
+        "enum": [
+          "asc",
+          "desc",
+        ],
+        "example": "desc",
+        "type": "string",
+      },
+    },
+    "required": [
+      "field",
+      "order",
     ],
     "type": "object",
   },

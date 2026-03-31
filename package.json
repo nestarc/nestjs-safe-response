@@ -14,6 +14,16 @@
   },
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./client": {
+      "types": "./dist/client/index.d.ts",
+      "default": "./dist/client/index.js"
+    }
+  },
   "files": [
     "dist"
   ],
@@ -41,7 +51,13 @@
     "@nestjs/core": "^10.0.0 || ^11.0.0",
     "@nestjs/swagger": "^8.0.0 || ^11.0.0",
     "reflect-metadata": "^0.2.0",
-    "rxjs": "^7.0.0"
+    "rxjs": "^7.0.0",
+    "nestjs-i18n": "^10.0.0 || ^11.0.0",
+    "nestjs-cls": "^4.0.0 || ^5.0.0"
+  },
+  "peerDependenciesMeta": {
+    "nestjs-i18n": { "optional": true },
+    "nestjs-cls": { "optional": true }
   },
   "devDependencies": {
     "@apidevtools/swagger-parser": "^12.1.0",

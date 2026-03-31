@@ -7,7 +7,7 @@ import {
   Logger,
   Optional,
 } from '@nestjs/common';
-import { HttpAdapterHost } from '@nestjs/core';
+import { HttpAdapterHost, ModuleRef } from '@nestjs/core';
 import { randomUUID } from 'node:crypto';
 import { SAFE_RESPONSE_OPTIONS, DEFAULT_ERROR_CODE_MAP, DEFAULT_PROBLEM_TITLE_MAP } from '../constants';
 import {
@@ -17,17 +17,96 @@ import {
   ProblemDetailsOptions,
   RequestIdOptions,
 } from '../interfaces';
+import { I18nAdapter, NestI18nAdapter } from '../adapters/i18n.adapter';
 
 @Catch()
 export class SafeExceptionFilter implements ExceptionFilter {
   private readonly logger = new Logger(SafeExceptionFilter.name);
+  private _clsService: any = undefined;
+  private _i18nAdapter: I18nAdapter | null | undefined = undefined;
 
   constructor(
     private readonly httpAdapterHost: HttpAdapterHost,
     @Optional()
     @Inject(SAFE_RESPONSE_OPTIONS)
     private readonly options: SafeResponseModuleOptions = {},
+    @Optional()
+    private readonly moduleRef?: ModuleRef,
   ) {}
+
+  private resolveClsService(): any {
+    if (this._clsService === undefined) {
+      if (!this.options.context || !this.moduleRef) {
+        this._clsService = null;
+        return null;
+      }
+      try {
+        const { ClsService } = require('nestjs-cls');
+        this._clsService = this.moduleRef.get(ClsService, { strict: false }) ?? null;
+      } catch {
+        this._clsService = null;
+      }
+    }
+    return this._clsService;
+  }
+
+  private resolveI18nAdapter(): I18nAdapter | null {
+    if (this._i18nAdapter === undefined) {
+      if (!this.options.i18n) {
+        this._i18nAdapter = null;
+      } else if (typeof this.options.i18n === 'object') {
+        this._i18nAdapter = this.options.i18n;
+      } else if (this.options.i18n === true && this.moduleRef) {
+        try {
+          const { I18nService } = require('nestjs-i18n');
+          const service = this.moduleRef.get(I18nService, { strict: false });
+          this._i18nAdapter = service ? new NestI18nAdapter(service) : null;
+        } catch {
+          this._i18nAdapter = null;
+        }
+      } else {
+        this._i18nAdapter = null;
+      }
+    }
+    return this._i18nAdapter;
+  }
+
+  private resolveContextMeta(request: any): Record<string, unknown> | undefined {
+    const contextOpts = this.options.context;
+    if (!contextOpts) return undefined;
+
+    const clsService = this.resolveClsService();
+    if (!clsService) return undefined;
+
+    if (contextOpts.resolver) {
+      try {
+        return contextOpts.resolver(clsService);
+      } catch {
+        return undefined;
+      }
+    }
+
+    if (contextOpts.fields) {
+      const result: Record<string, unknown> = {};
+      let hasValue = false;
+      for (const [metaField, clsKey] of Object.entries(contextOpts.fields)) {
+        const value = clsService.get(clsKey);
+        if (value !== undefined && value !== null) {
+          result[metaField] = value;
+          hasValue = true;
+        }
+      }
+      return hasValue ? result : undefined;
+    }
+
+    return undefined;
+  }
+
+  private translateMessage(message: string, request: any): string {
+    const adapter = this.resolveI18nAdapter();
+    if (!adapter) return message;
+    return adapter.translate(message, { lang: adapter.resolveLanguage(request) });
+  }
 
   catch(exception: unknown, host: ArgumentsHost): void {
     if (host.getType() !== 'http') {
@@ -108,6 +187,12 @@ export class SafeExceptionFilter implements ExceptionFilter {
       }
     }
 
+    // Translate error message if i18n is enabled
+    const translatedMessage = this.translateMessage(message, request);
+
+    // Resolve CLS context fields
+    const contextMeta = this.resolveContextMeta(request);
+
     // RFC 9457 Problem Details mode
     const pdOpts = this.options.problemDetails;
     if (pdOpts) {
@@ -123,16 +208,18 @@ export class SafeExceptionFilter implements ExceptionFilter {
         type = 'about:blank';
       }
 
+      const meta = { ...responseTimeMeta, ...contextMeta };
+
       const problemBody: SafeProblemDetailsResponse = {
         type,
         title: DEFAULT_PROBLEM_TITLE_MAP[statusCode] ?? 'Error',
         status: statusCode,
-        detail: message,
+        detail: translatedMessage,
         instance: requestUrl,
         ...(errorCode && { code: errorCode }),
         ...(requestId && { requestId }),
         ...(details !== undefined && { details }),
-        ...(responseTimeMeta && { meta: responseTimeMeta }),
+        ...(Object.keys(meta).length > 0 && { meta }),
       };
 
       // Set Content-Type: application/problem+json
@@ -153,13 +240,14 @@ export class SafeExceptionFilter implements ExceptionFilter {
       ...(requestId && { requestId }),
       error: {
         code: errorCode,
-        message,
+        message: translatedMessage,
         ...(details !== undefined && { details }),
       },
     };
 
-    if (responseTimeMeta) {
-      body.meta = responseTimeMeta;
+    const errorMeta = { ...responseTimeMeta, ...contextMeta };
+    if (Object.keys(errorMeta).length > 0) {
+      body.meta = errorMeta;
     }
 
     const includeTimestamp = this.options.timestamp ?? true;

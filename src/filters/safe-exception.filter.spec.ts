@@ -71,8 +71,9 @@ describe('SafeExceptionFilter', () => {
   function createFilter(
     adapterHost: HttpAdapterHost,
     options: SafeResponseModuleOptions = {},
+    moduleRef?: any,
   ) {
-    return new SafeExceptionFilter(adapterHost, options);
+    return new SafeExceptionFilter(adapterHost, options, moduleRef);
   }
 
   beforeEach(() => {
@@ -958,6 +959,137 @@ describe('SafeExceptionFilter', () => {
 
       const mockRequest = (host as any).switchToHttp().getRequest();
       expect(mockRequest.__safeResponseErrorHandled).toBe(true);
+    });
+  });
+
+  // ─── i18n Translation ───
+
+  describe('i18n 에러 메시지 번역', () => {
+    it('i18n 어댑터가 있으면 에러 메시지를 번역', () => {
+      const mockAdapter = {
+        translate: jest.fn((key: string) => key === 'Not Found' ? '찾을 수 없습니다' : key),
+        resolveLanguage: jest.fn(() => 'ko'),
+      };
+      const { adapterHost, replyFn } = createMockHttpAdapterHost();
+      const filter = createFilter(adapterHost, { i18n: mockAdapter });
+      const host = createMockArgumentsHost();
+
+      filter.catch(new NotFoundException(), host);
+
+      const body = replyFn.mock.calls[0][1];
+      expect(body.error.message).toBe('찾을 수 없습니다');
+    });
+
+    it('i18n이 false이면 원본 메시지 유지', () => {
+      const { adapterHost, replyFn } = createMockHttpAdapterHost();
+      const filter = createFilter(adapterHost, {});
+      const host = createMockArgumentsHost();
+
+      filter.catch(new NotFoundException(), host);
+
+      const body = replyFn.mock.calls[0][1];
+      expect(body.error.message).toBe('Not Found');
+    });
+
+    it('Problem Details 모드에서 detail 필드를 번역', () => {
+      const mockAdapter = {
+        translate: jest.fn((key: string) => key === 'Not Found' ? '찾을 수 없습니다' : key),
+        resolveLanguage: jest.fn(() => 'ko'),
+      };
+      const { adapterHost, replyFn } = createMockHttpAdapterHost();
+      const filter = createFilter(adapterHost, {
+        problemDetails: true,
+        i18n: mockAdapter,
+      });
+      const host = createMockArgumentsHost();
+
+      filter.catch(new NotFoundException(), host);
+
+      const body = replyFn.mock.calls[0][1];
+      expect(body.detail).toBe('찾을 수 없습니다');
+    });
+
+    it('커스텀 i18n 어댑터를 사용할 수 있음', () => {
+      const customAdapter = {
+        translate: (key: string) => `[translated] ${key}`,
+        resolveLanguage: () => 'custom',
+      };
+      const { adapterHost, replyFn } = createMockHttpAdapterHost();
+      const filter = createFilter(adapterHost, { i18n: customAdapter });
+      const host = createMockArgumentsHost();
+
+      filter.catch(new BadRequestException('errors.VALIDATION'), host);
+
+      const body = replyFn.mock.calls[0][1];
+      expect(body.error.message).toBe('[translated] errors.VALIDATION');
+    });
+  });
+
+  // ─── CLS Context ───
+
+  describe('CLS 컨텍스트 에러 응답 주입', () => {
+    it('context.fields가 설정되면 에러 응답 meta에 CLS 값 주입', () => {
+      const mockClsService = {
+        get: jest.fn((key: string) => key === 'traceId' ? 'trace-xyz' : undefined),
+      };
+      const mockModuleRef = { get: jest.fn(() => mockClsService) };
+      jest.mock('nestjs-cls', () => ({ ClsService: class {} }), { virtual: true });
+
+      const { adapterHost, replyFn } = createMockHttpAdapterHost();
+      const filter = createFilter(
+        adapterHost,
+        { context: { fields: { traceId: 'traceId' } } },
+        mockModuleRef,
+      );
+      const host = createMockArgumentsHost();
+
+      filter.catch(new NotFoundException(), host);
+
+      const body = replyFn.mock.calls[0][1];
+      expect(body.meta?.traceId).toBe('trace-xyz');
+
+      jest.restoreAllMocks();
+    });
+
+    it('context 옵션이 없으면 CLS 값을 주입하지 않음', () => {
+      const { adapterHost, replyFn } = createMockHttpAdapterHost();
+      const filter = createFilter(adapterHost, {});
+      const host = createMockArgumentsHost();
+
+      filter.catch(new NotFoundException(), host);
+
+      const body = replyFn.mock.calls[0][1];
+      expect(body.meta).toBeUndefined();
+    });
+
+    it('CLS와 responseTime을 동시에 meta에 포함', () => {
+      const mockClsService = {
+        get: jest.fn((key: string) => key === 'correlationId' ? 'corr-123' : undefined),
+      };
+      const mockModuleRef = { get: jest.fn(() => mockClsService) };
+      jest.mock('nestjs-cls', () => ({ ClsService: class {} }), { virtual: true });
+
+      const { adapterHost, replyFn } = createMockHttpAdapterHost();
+      const filter = createFilter(
+        adapterHost,
+        {
+          responseTime: true,
+          context: { fields: { correlationId: 'correlationId' } },
+        },
+        mockModuleRef,
+      );
+      const host = createMockArgumentsHost();
+      // Set start time on request to simulate interceptor
+      const mockRequest = (host as any).switchToHttp().getRequest();
+      mockRequest.__safeResponseStartTime = performance.now() - 50;
+
+      filter.catch(new NotFoundException(), host);
+
+      const body = replyFn.mock.calls[0][1];
+      expect(body.meta?.correlationId).toBe('corr-123');
+      expect(body.meta?.responseTime).toBeGreaterThanOrEqual(0);
+
+      jest.restoreAllMocks();
     });
   });
 });

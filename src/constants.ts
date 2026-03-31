@@ -8,6 +8,11 @@ export const CURSOR_PAGINATED_KEY = 'CURSOR_PAGINATED';
 
 export const PROBLEM_TYPE_KEY = 'PROBLEM_TYPE';
 
+export const SORT_META_KEY = 'SORT_META';
+export const FILTER_META_KEY = 'FILTER_META';
+
+export const SKIP_GLOBAL_ERRORS_KEY = 'SKIP_GLOBAL_ERRORS';
+
 export const DEFAULT_PROBLEM_TITLE_MAP: Record<number, string> = {
   400: 'Bad Request',
   401: 'Unauthorized',
