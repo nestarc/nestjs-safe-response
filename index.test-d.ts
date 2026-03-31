@@ -94,6 +94,35 @@ const fullOptions: SafeResponseModuleOptions = {
 };
 expectType<SafeResponseModuleOptions>(fullOptions);
 
+// v0.9.0 options: swagger, context, i18n
+const v090Options: SafeResponseModuleOptions = {
+  swagger: { globalErrors: [401, 403, 500] },
+  context: { fields: { traceId: 'traceId', correlationId: 'correlationId' } },
+  i18n: true,
+};
+expectType<SafeResponseModuleOptions>(v090Options);
+
+const v090OptionsDetailed: SafeResponseModuleOptions = {
+  swagger: {
+    globalErrors: [
+      401,
+      { status: 403, code: 'FORBIDDEN', description: 'Insufficient permissions' },
+    ],
+  },
+  context: {
+    resolver: (cls: unknown) => ({ traceId: 'abc' }),
+  },
+  i18n: {
+    translate: (key: string) => key,
+    resolveLanguage: () => 'en',
+  },
+};
+expectType<SafeResponseModuleOptions>(v090OptionsDetailed);
+
+// i18n: false should be valid
+const noI18n: SafeResponseModuleOptions = { i18n: false };
+expectType<SafeResponseModuleOptions>(noI18n);
+
 // ─── ApiSafeErrorResponseOptions ───
 
 const errorOpts: ApiSafeErrorResponseOptions = {

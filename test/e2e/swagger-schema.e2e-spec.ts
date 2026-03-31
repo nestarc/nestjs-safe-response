@@ -2,6 +2,7 @@ import { Test } from '@nestjs/testing';
 import { INestApplication, Module } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { SafeResponseModule } from '../../src/safe-response.module';
+import { applyGlobalErrors } from '../../src/swagger/global-errors';
 import { SwaggerTestController } from './swagger-test.controller';
 
 @Module({
@@ -320,6 +321,70 @@ describe('Swagger Schema E2E', () => {
 
     it('전체 paths 구조가 변경되면 스냅샷이 깨져야 한다', () => {
       expect(document.paths).toMatchSnapshot();
+    });
+  });
+
+  // ─── applyGlobalErrors 통합 검증 ───
+
+  describe('applyGlobalErrors 통합', () => {
+    it('글로벌 에러를 실제 Swagger 문서에 적용할 수 있다', () => {
+      const docCopy = structuredClone(document);
+      applyGlobalErrors(docCopy, {
+        swagger: { globalErrors: [401, 403, 500] },
+      });
+
+      // 모든 operation에 글로벌 에러가 추가되어야 함
+      for (const pathItem of Object.values(docCopy.paths) as any[]) {
+        for (const [method, operation] of Object.entries(pathItem)) {
+          if (!['get', 'post', 'put', 'patch', 'delete'].includes(method)) continue;
+          expect((operation as any).responses['401']).toBeDefined();
+          expect((operation as any).responses['403']).toBeDefined();
+          expect((operation as any).responses['500']).toBeDefined();
+        }
+      }
+    });
+
+    it('problemDetails 모드에서 application/problem+json으로 주입된다', () => {
+      const docCopy = structuredClone(document);
+      applyGlobalErrors(docCopy, {
+        problemDetails: true,
+        swagger: { globalErrors: [401, 500] },
+      });
+
+      const firstPath = Object.values(docCopy.paths)[0] as any;
+      const firstOp = firstPath.get || firstPath.post;
+      expect(firstOp.responses['401'].content['application/problem+json']).toBeDefined();
+      expect(firstOp.responses['401'].content['application/json']).toBeUndefined();
+    });
+
+    it('기존 라우트별 에러 응답을 덮어쓰지 않는다', () => {
+      const docCopy = structuredClone(document);
+      // 이미 존재하는 에러 응답 (예: @ApiSafeErrorResponse로 추가된 것)
+      const firstPathKey = Object.keys(docCopy.paths)[0];
+      const firstMethod = Object.keys(docCopy.paths[firstPathKey])[0];
+      docCopy.paths[firstPathKey][firstMethod].responses['401'] = {
+        description: 'Custom route-level 401',
+      };
+
+      applyGlobalErrors(docCopy, {
+        swagger: { globalErrors: [401, 500] },
+      });
+
+      expect(docCopy.paths[firstPathKey][firstMethod].responses['401'].description)
+        .toBe('Custom route-level 401');
+      // 500은 추가되어야 함
+      expect(docCopy.paths[firstPathKey][firstMethod].responses['500']).toBeDefined();
+    });
+
+    it('applyGlobalErrors 적용 후에도 OpenAPI 문서가 유효하다', async () => {
+      const SwaggerParser = (await import('@apidevtools/swagger-parser')).default;
+      const docCopy = structuredClone(document);
+      applyGlobalErrors(docCopy, {
+        swagger: { globalErrors: [401, 403, 500] },
+      });
+
+      const api: any = await SwaggerParser.validate(docCopy);
+      expect(api.openapi).toBeDefined();
     });
   });
 });

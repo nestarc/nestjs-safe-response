@@ -238,4 +238,91 @@ describe('applyGlobalErrors', () => {
 
     expect(doc.paths['/test'].get.responses['500']).toBeDefined();
   });
+
+  // ─── Problem Details Mode ───
+
+  describe('problemDetails mode', () => {
+    it('should use application/problem+json when problemDetails is enabled', () => {
+      const doc = createMinimalDocument();
+      const options: SafeResponseModuleOptions = {
+        problemDetails: true,
+        swagger: { globalErrors: [401, 500] },
+      };
+
+      applyGlobalErrors(doc, options);
+
+      const res401 = doc.paths['/api/users'].get.responses['401'];
+      expect(res401.content['application/problem+json']).toBeDefined();
+      expect(res401.content['application/json']).toBeUndefined();
+    });
+
+    it('should reference ProblemDetailsDto when problemDetails is enabled', () => {
+      const doc = createMinimalDocument();
+      const options: SafeResponseModuleOptions = {
+        problemDetails: true,
+        swagger: { globalErrors: [404] },
+      };
+
+      applyGlobalErrors(doc, options);
+
+      const schema = doc.paths['/api/users'].get.responses['404']
+        .content['application/problem+json'].schema;
+      expect(schema.$ref).toBe('#/components/schemas/ProblemDetailsDto');
+    });
+
+    it('should ensure ProblemDetailsDto schema in components', () => {
+      const doc: Record<string, any> = {
+        openapi: '3.0.0',
+        paths: { '/test': { get: { responses: {} } } },
+      };
+      const options: SafeResponseModuleOptions = {
+        problemDetails: true,
+        swagger: { globalErrors: [500] },
+      };
+
+      applyGlobalErrors(doc, options);
+
+      expect(doc.components.schemas.ProblemDetailsDto).toBeDefined();
+      expect(doc.components.schemas.ProblemDetailsDto.properties.type).toBeDefined();
+      expect(doc.components.schemas.ProblemDetailsDto.properties.status).toBeDefined();
+    });
+
+    it('should use application/json when problemDetails is false', () => {
+      const doc = createMinimalDocument();
+      const options: SafeResponseModuleOptions = {
+        problemDetails: false,
+        swagger: { globalErrors: [500] },
+      };
+
+      applyGlobalErrors(doc, options);
+
+      const res500 = doc.paths['/api/users'].get.responses['500'];
+      expect(res500.content['application/json']).toBeDefined();
+      expect(res500.content['application/problem+json']).toBeUndefined();
+    });
+
+    it('should use application/json when problemDetails is undefined', () => {
+      const doc = createMinimalDocument();
+      const options: SafeResponseModuleOptions = {
+        swagger: { globalErrors: [500] },
+      };
+
+      applyGlobalErrors(doc, options);
+
+      expect(doc.paths['/api/users'].get.responses['500'].content['application/json']).toBeDefined();
+    });
+
+    it('should use problemDetails with baseUrl config', () => {
+      const doc = createMinimalDocument();
+      const options: SafeResponseModuleOptions = {
+        problemDetails: { baseUrl: 'https://api.example.com/problems' },
+        swagger: { globalErrors: [400] },
+      };
+
+      applyGlobalErrors(doc, options);
+
+      expect(doc.paths['/api/users'].get.responses['400']
+        .content['application/problem+json']).toBeDefined();
+    });
+  });
 });

@@ -65,9 +65,11 @@ export interface SafeProblemDetailsResponse {
   requestId?: string;
   /** Extension member: validation error details */
   details?: unknown;
-  /** Extension member: response time */
+  /** Extension member: response time and context */
   meta?: {
     responseTime?: number;
+    /** Additional context fields (e.g., traceId, correlationId) */
+    [key: string]: unknown;
   };
 }
 
@@ -137,6 +139,8 @@ export interface SafeErrorResponse {
   };
   meta?: {
     responseTime?: number;
+    /** Additional context fields (e.g., traceId, correlationId) */
+    [key: string]: unknown;
   };
   timestamp?: string;
   path?: string;

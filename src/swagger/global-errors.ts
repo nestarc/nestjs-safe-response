@@ -24,8 +24,10 @@ export function applyGlobalErrors(
   const paths = document.paths;
   if (!paths) return document;
 
-  // Ensure SafeErrorResponseDto schema exists in components
-  ensureErrorSchema(document);
+  const useProblemDetails = !!options.problemDetails;
+
+  // Ensure error schema exists in components
+  ensureErrorSchema(document, useProblemDetails);
 
   for (const pathItem of Object.values(paths)) {
     if (!pathItem || typeof pathItem !== 'object') continue;
@@ -49,7 +51,7 @@ export function applyGlobalErrors(
         // Route-level responses take priority — don't overwrite
         if (operation.responses[statusStr]) continue;
 
-        operation.responses[statusStr] = buildErrorResponse(status, code, message, description);
+        operation.responses[statusStr] = buildErrorResponse(status, code, message, description, useProblemDetails);
       }
     }
   }
@@ -84,7 +86,21 @@ function buildErrorResponse(
   code: string,
   message: string,
   description: string,
+  useProblemDetails: boolean,
 ): Record<string, any> {
+  if (useProblemDetails) {
+    return {
+      description,
+      content: {
+        'application/problem+json': {
+          schema: {
+            $ref: '#/components/schemas/ProblemDetailsDto',
+          },
+        },
+      },
+    };
+  }
+
   return {
     description,
     content: {
@@ -112,30 +128,48 @@ function buildErrorResponse(
   };
 }
 
-function ensureErrorSchema(document: Record<string, any>): void {
+function ensureErrorSchema(document: Record<string, any>, useProblemDetails: boolean): void {
   if (!document.components) document.components = {};
   if (!document.components.schemas) document.components.schemas = {};
 
-  // Only add if not already present (library decorators usually register it)
-  if (!document.components.schemas.SafeErrorResponseDto) {
-    document.components.schemas.SafeErrorResponseDto = {
-      type: 'object',
-      properties: {
-        success: { type: 'boolean', example: false },
-        statusCode: { type: 'number', example: 400 },
-        requestId: { type: 'string', example: '550e8400-e29b-41d4-a716-446655440000' },
-        error: {
-          type: 'object',
-          properties: {
-            code: { type: 'string', example: 'BAD_REQUEST' },
-            message: { type: 'string', example: 'Validation failed' },
-            details: {},
-          },
+  if (useProblemDetails) {
+    // Ensure ProblemDetailsDto schema exists
+    if (!document.components.schemas.ProblemDetailsDto) {
+      document.components.schemas.ProblemDetailsDto = {
+        type: 'object',
+        properties: {
+          type: { type: 'string', example: 'https://api.example.com/problems/not-found' },
+          title: { type: 'string', example: 'Not Found' },
+          status: { type: 'number', example: 404 },
+          detail: { type: 'string', example: 'Resource not found' },
+          instance: { type: 'string', example: '/api/users/123' },
+          code: { type: 'string', example: 'NOT_FOUND' },
+          requestId: { type: 'string', example: '550e8400-e29b-41d4-a716-446655440000' },
         },
-        timestamp: { type: 'string', example: '2025-03-21T12:00:00.000Z' },
-        path: { type: 'string', example: '/api/users' },
-      },
-    };
+      };
+    }
+  } else {
+    // Ensure SafeErrorResponseDto schema exists
+    if (!document.components.schemas.SafeErrorResponseDto) {
+      document.components.schemas.SafeErrorResponseDto = {
+        type: 'object',
+        properties: {
+          success: { type: 'boolean', example: false },
+          statusCode: { type: 'number', example: 400 },
+          requestId: { type: 'string', example: '550e8400-e29b-41d4-a716-446655440000' },
+          error: {
+            type: 'object',
+            properties: {
+              code: { type: 'string', example: 'BAD_REQUEST' },
+              message: { type: 'string', example: 'Validation failed' },
+              details: {},
+            },
+          },
+          timestamp: { type: 'string', example: '2025-03-21T12:00:00.000Z' },
+          path: { type: 'string', example: '/api/users' },
+        },
+      };
+    }
   }
 }
 

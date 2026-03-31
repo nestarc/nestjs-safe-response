@@ -5,6 +5,31 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.0] - 2026-03-31
+
+### Added
+- **Frontend client types** (`nestjs-safe-response/client`) — zero-dependency TypeScript types and type guards (`isSuccess`, `isError`, `isPaginated`, `isOffsetPagination`, `isCursorPagination`) for frontend consumers. New `SafeResponse<T>` union type.
+- **Sort/Filter metadata** — `@SortMeta()` and `@FilterMeta()` decorators to include sorting and filtering information in response `meta`. Works with both offset and cursor pagination.
+- **Global error Swagger documentation** — `applyGlobalErrors(document, options)` utility to inject common error responses (e.g., 401, 403, 500) into all OpenAPI operations. `@SkipGlobalErrors()` decorator to exclude specific routes.
+- **nestjs-i18n integration** — `i18n` module option with `I18nAdapter` interface for automatic error message and `@ResponseMessage()` translation. Built-in `NestI18nAdapter` for nestjs-i18n, or pass a custom adapter.
+- **nestjs-cls integration** — `context` module option with `ContextOptions` for injecting CLS store values (e.g., traceId, correlationId) into response `meta` via field mapping or custom resolver.
+- `@SkipGlobalErrors()` decorator (runtime + Swagger `x-skip-global-errors` extension)
+- `SortMetaDto`, `FilterMetaDto` Swagger DTO classes
+- `SortInfo`, `SwaggerOptions`, `ContextOptions` type exports
+- `I18nAdapter`, `NestI18nAdapter` exports from `nestjs-safe-response`
+- `applyGlobalErrors` utility export
+- `SORT_META_KEY`, `FILTER_META_KEY`, `SKIP_GLOBAL_ERRORS_KEY` constant exports
+- `package.json` `exports` map with `"./client"` subpath entry point
+
+### Changed
+- `ResponseMeta` now includes optional `sort`, `filters`, and index signature `[key: string]: unknown`
+- `SafeErrorResponse.meta` and `SafeProblemDetailsResponse.meta` now include `[key: string]: unknown` for context fields
+- `ErrorResponseMetaDto` now supports additional properties for context metadata
+- `ResponseMetaDto` now includes `sort` and `filters` fields
+- Interceptor and filter constructors now accept optional `ModuleRef` for CLS/i18n auto-detection
+- `nestjs-i18n` (^10 || ^11) and `nestjs-cls` (^4 || ^5) added as optional peer dependencies
+- `applyGlobalErrors` respects `problemDetails` option — uses `application/problem+json` + `ProblemDetailsDto` when enabled
+
 ## [0.8.0] - 2026-03-28
 
 ### Added

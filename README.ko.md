@@ -462,6 +462,9 @@ SafeResponseModule.registerAsync({
 | `problemDetails` | `boolean \| ProblemDetailsOptions` | `false` | RFC 9457 Problem Details 에러 포맷 활성화 |
 | `successCodeMapper` | `(statusCode: number) => string \| undefined` | `undefined` | HTTP 상태 코드를 성공 코드 문자열에 매핑 |
 | `transformResponse` | `(data: unknown) => unknown` | `undefined` | 응답 래핑 전 데이터 변환 (동기 함수만 지원) |
+| `swagger` | `SwaggerOptions` | `undefined` | Swagger 문서 옵션 (예: `globalErrors`로 모든 라우트에 공통 에러 추가) |
+| `context` | `ContextOptions` | `undefined` | CLS 스토어 값(traceId 등)을 응답 `meta`에 주입. `nestjs-cls` 필요. |
+| `i18n` | `boolean \| I18nAdapter` | `undefined` | 에러/성공 메시지 다국어 지원. `true`는 `nestjs-i18n` 자동 감지, 또는 커스텀 어댑터 전달. |
 
 #### 성공 코드 매핑
 
