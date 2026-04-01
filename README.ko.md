@@ -351,6 +351,71 @@ findAll() {
 }
 ```
 
+### `@SortMeta()` / `@FilterMeta()`
+
+정렬 및 필터 메타데이터를 응답에 포함합니다. 핸들러가 `sort`, `filters` 필드를 데이터와 함께 반환해야 합니다.
+
+```typescript
+@Get()
+@Paginated()
+@SortMeta()
+@FilterMeta()
+@ApiPaginatedSafeResponse(UserDto)
+async findAll(
+  @Query('sortBy') sortBy = 'createdAt',
+  @Query('order') order: 'asc' | 'desc' = 'desc',
+  @Query('status') status?: string,
+) {
+  const [items, total] = await this.usersService.findAndCount({ sortBy, order, status });
+  return {
+    data: items, total, page: 1, limit: 20,
+    sort: { field: sortBy, order },
+    filters: { ...(status && { status }) },
+  };
+}
+```
+
+응답:
+
+```json
+{
+  "success": true,
+  "statusCode": 200,
+  "data": [...],
+  "meta": {
+    "pagination": { "type": "offset", "page": 1, "limit": 20, "total": 100, "totalPages": 5, "hasNext": true, "hasPrev": false },
+    "sort": { "field": "createdAt", "order": "desc" },
+    "filters": { "status": "active" }
+  }
+}
+```
+
+### `@SkipGlobalErrors()`
+
+`applyGlobalErrors()` 글로벌 에러 주입에서 해당 라우트를 제외합니다.
+
+## 글로벌 에러 Swagger 문서화
+
+모든 OpenAPI 엔드포인트에 공통 에러 응답(401, 403, 500 등)을 한 번에 주입합니다.
+
+```typescript
+import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
+import { applyGlobalErrors, SafeResponseModule } from 'nestjs-safe-response';
+
+// 1. swagger 옵션으로 등록
+SafeResponseModule.register({
+  swagger: { globalErrors: [401, 403, { status: 500, message: '서버 오류' }] },
+});
+
+// 2. 문서 생성 후 적용
+const config = new DocumentBuilder().setTitle('My API').build();
+const document = SwaggerModule.createDocument(app, config);
+applyGlobalErrors(document, moduleOptions);  // document를 직접 변경
+SwaggerModule.setup('api', app, document);
+```
+
+`@SkipGlobalErrors()`로 특정 라우트를 제외할 수 있습니다.
+
 ## 요청 ID
 
 모든 응답에 고유 식별자를 포함하여 프로덕션 디버깅과 분산 추적에 활용합니다.
@@ -430,6 +495,90 @@ SafeResponseModule.register({
 - 확장 멤버 유지: `code`, `requestId`, `details` (유효성 검사 에러), `meta.responseTime`
 - 성공 응답에는 **영향 없음** — 에러 응답만 포맷 변경
 - Swagger 문서화: `@ApiSafeProblemResponse(status)` 사용
+
+## 프론트엔드 클라이언트 타입
+
+`nestjs-safe-response/client`는 NestJS, Swagger, `reflect-metadata` 의존 없이 프론트엔드에서 사용할 수 있는 TypeScript 타입과 타입 가드를 제공합니다.
+
+```typescript
+import type { SafeResponse, SafeSuccessResponse } from 'nestjs-safe-response/client';
+import {
+  isSuccess, isError, isPaginated, isOffsetPagination, isCursorPagination,
+  isProblemDetailsResponse, hasResponseTime, hasSort, hasFilters,
+} from 'nestjs-safe-response/client';
+
+const res: SafeResponse<User[]> = await fetch('/api/users').then(r => r.json());
+
+if (isSuccess(res)) {
+  console.log(res.data);  // User[]
+
+  if (isPaginated(res.meta) && isOffsetPagination(res.meta.pagination)) {
+    console.log(`${res.meta.pagination.page} / ${res.meta.pagination.totalPages} 페이지`);
+  }
+}
+
+if (isError(res)) {
+  console.error(res.error.code, res.error.message);
+}
+
+// RFC 9457 Problem Details (일반 에러와 다른 shape)
+if (isProblemDetailsResponse(res)) {
+  console.error(res.type, res.detail, res.instance);
+}
+```
+
+## 국제화 (i18n)
+
+`nestjs-i18n` 또는 커스텀 어댑터를 통해 에러 메시지와 `@ResponseMessage()` 값을 자동 번역합니다.
+
+```typescript
+// nestjs-i18n 자동 감지 (피어 의존으로 설치 필요)
+SafeResponseModule.register({ i18n: true });
+
+// 또는 커스텀 어댑터 제공
+SafeResponseModule.register({
+  i18n: {
+    translate: (key, opts) => myTranslator.t(key, opts?.lang),
+    resolveLanguage: (request) => request.headers['accept-language'] ?? 'en',
+  },
+});
+```
+
+커스텀 어댑터는 예외 안전합니다 — `translate()`나 `resolveLanguage()`가 예외를 던져도 원본 메시지로 폴백합니다.
+
+## 컨텍스트 주입 (nestjs-cls)
+
+요청 범위 컨텍스트 값(traceId, correlationId 등)을 모든 응답의 `meta` 필드에 주입합니다. [nestjs-cls](https://www.npmjs.com/package/nestjs-cls) 필요.
+
+```typescript
+SafeResponseModule.register({
+  context: {
+    // CLS 스토어 키를 응답 meta 필드로 매핑
+    fields: { traceId: 'traceId', correlationId: 'correlationId' },
+  },
+});
+
+// 또는 커스텀 리졸버로 완전 제어
+SafeResponseModule.register({
+  context: {
+    resolver: (clsService) => ({
+      traceId: clsService.get('traceId'),
+      region: clsService.get('region'),
+    }),
+  },
+});
+```
+
+응답:
+
+```json
+{
+  "success": true,
+  "statusCode": 200,
+  "data": { "..." },
+  "meta": { "traceId": "abc-123", "correlationId": "req-456" }
+}
+```
 
 ## 모듈 옵션
 

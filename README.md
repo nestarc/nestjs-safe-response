@@ -358,6 +358,71 @@ Response:
 }
 ```
 
+### `@SortMeta()` / `@FilterMeta()`
+
+Include sorting and filtering metadata in the response. The handler must return `sort` and/or `filters` fields alongside the data.
+
+```typescript
+@Get()
+@Paginated()
+@SortMeta()
+@FilterMeta()
+@ApiPaginatedSafeResponse(UserDto)
+async findAll(
+  @Query('sortBy') sortBy = 'createdAt',
+  @Query('order') order: 'asc' | 'desc' = 'desc',
+  @Query('status') status?: string,
+) {
+  const [items, total] = await this.usersService.findAndCount({ sortBy, order, status });
+  return {
+    data: items, total, page: 1, limit: 20,
+    sort: { field: sortBy, order },
+    filters: { ...(status && { status }) },
+  };
+}
+```
+
+Response:
+
+```json
+{
+  "success": true,
+  "statusCode": 200,
+  "data": [...],
+  "meta": {
+    "pagination": { "type": "offset", "page": 1, "limit": 20, "total": 100, "totalPages": 5, "hasNext": true, "hasPrev": false },
+    "sort": { "field": "createdAt", "order": "desc" },
+    "filters": { "status": "active" }
+  }
+}
+```
+
+### `@SkipGlobalErrors()`
+
+Excludes a route from `applyGlobalErrors()` global error injection. Useful for routes with custom error schemas.
+
+## Global Error Swagger Documentation
+
+Inject common error responses (e.g., 401, 403, 500) into all OpenAPI operations at once, instead of decorating every route.
+
+```typescript
+import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
+import { applyGlobalErrors, SafeResponseModule } from 'nestjs-safe-response';
+
+// 1. Register with swagger option
+SafeResponseModule.register({
+  swagger: { globalErrors: [401, 403, { status: 500, message: 'Unexpected error' }] },
+});
+
+// 2. Apply after document creation
+const config = new DocumentBuilder().setTitle('My API').build();
+const document = SwaggerModule.createDocument(app, config);
+applyGlobalErrors(document, moduleOptions);  // mutates document in-place
+SwaggerModule.setup('api', app, document);
+```
+
+Use `@SkipGlobalErrors()` on routes that should not receive global error schemas.
+
 ## Request ID
 
 Enable request ID tracking to include a unique identifier in every response — essential for production debugging and distributed tracing.
@@ -437,6 +502,90 @@ Error response:
 - Preserves extension members: `code`, `requestId`, `details` (validation errors), `meta.responseTime`
 - Success responses are **not affected** — only error responses change format
 - Use `@ApiSafeProblemResponse(status)` for Swagger documentation
+
+## Frontend Client Types
+
+`nestjs-safe-response/client` provides zero-dependency TypeScript types and type guards for frontend consumers. No NestJS, Swagger, or `reflect-metadata` required.
+
+```typescript
+import type { SafeResponse, SafeSuccessResponse } from 'nestjs-safe-response/client';
+import {
+  isSuccess, isError, isPaginated, isOffsetPagination, isCursorPagination,
+  isProblemDetailsResponse, hasResponseTime, hasSort, hasFilters,
+} from 'nestjs-safe-response/client';
+
+const res: SafeResponse<User[]> = await fetch('/api/users').then(r => r.json());
+
+if (isSuccess(res)) {
+  console.log(res.data);  // User[]
+
+  if (isPaginated(res.meta) && isOffsetPagination(res.meta.pagination)) {
+    console.log(`Page ${res.meta.pagination.page} of ${res.meta.pagination.totalPages}`);
+  }
+}
+
+if (isError(res)) {
+  console.error(res.error.code, res.error.message);
+}
+
+// RFC 9457 Problem Details (different shape from standard errors)
+if (isProblemDetailsResponse(res)) {
+  console.error(res.type, res.detail, res.instance);
+}
+```
+
+## Internationalization (i18n)
+
+Translate error messages and `@ResponseMessage()` values automatically via `nestjs-i18n` or a custom adapter.
+
+```typescript
+// Auto-detect nestjs-i18n (must be installed as peer dependency)
+SafeResponseModule.register({ i18n: true });
+
+// Or provide a custom adapter
+SafeResponseModule.register({
+  i18n: {
+    translate: (key, opts) => myTranslator.t(key, opts?.lang),
+    resolveLanguage: (request) => request.headers['accept-language'] ?? 'en',
+  },
+});
+```
+
+Custom adapters are exception-safe — if `translate()` or `resolveLanguage()` throws, the original untranslated message is used.
+
+## Context Injection (nestjs-cls)
+
+Inject request-scoped context values (e.g., `traceId`, `correlationId`) into every response's `meta` field. Requires [nestjs-cls](https://www.npmjs.com/package/nestjs-cls).
+
+```typescript
+SafeResponseModule.register({
+  context: {
+    // Map CLS store keys to response meta fields
+    fields: { traceId: 'traceId', correlationId: 'correlationId' },
+  },
+});
+
+// Or use a custom resolver for full control
+SafeResponseModule.register({
+  context: {
+    resolver: (clsService) => ({
+      traceId: clsService.get('traceId'),
+      region: clsService.get('region'),
+    }),
+  },
+});
+```
+
+Response:
+
+```json
+{
+  "success": true,
+  "statusCode": 200,
+  "data": { "..." },
+  "meta": { "traceId": "abc-123", "correlationId": "req-456" }
+}
+```
 
 ## Module Options
 
