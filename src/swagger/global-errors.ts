@@ -1,6 +1,33 @@
 import { DEFAULT_ERROR_CODE_MAP } from '../constants';
 import { SafeResponseModuleOptions, ApiSafeErrorResponseConfig } from '../interfaces';
 
+// @nestjs/swagger exports OpenAPIObject but not its nested types (PathItemObject,
+// OperationObject, ResponseObject, etc.). We define a structural interface that
+// accepts both the strict OpenAPIObject and looser test mocks, while providing
+// type guidance for the fields we actually read/write.
+
+/** Minimal structural type for an OpenAPI document — compatible with @nestjs/swagger's OpenAPIObject. */
+export interface OpenAPIDocumentLike {
+  paths?: Record<string, Record<string, unknown>>;
+  components?: {
+    schemas?: Record<string, unknown>;
+    [key: string]: unknown;
+  };
+  [key: string]: unknown;
+}
+
+/** Subset of OpenAPI OperationObject — only the fields we inspect or mutate. */
+interface OperationLike {
+  responses?: Record<string, unknown>;
+  'x-skip-global-errors'?: boolean;
+}
+
+/** OpenAPI ResponseObject shape we construct — schema + description. */
+interface ResponseShape {
+  description: string;
+  content: Record<string, { schema: Record<string, unknown> }>;
+}
+
 /**
  * Apply global error response schemas to all operations in an OpenAPI document.
  *
@@ -15,9 +42,9 @@ import { SafeResponseModuleOptions, ApiSafeErrorResponseConfig } from '../interf
  * Route-level error responses take priority over global ones (no overwriting).
  */
 export function applyGlobalErrors(
-  document: Record<string, any>,
+  document: OpenAPIDocumentLike,
   options: SafeResponseModuleOptions,
-): Record<string, any> {
+): OpenAPIDocumentLike {
   const globalErrors = options.swagger?.globalErrors;
   if (!globalErrors?.length) return document;
 
@@ -32,10 +59,12 @@ export function applyGlobalErrors(
   for (const pathItem of Object.values(paths)) {
     if (!pathItem || typeof pathItem !== 'object') continue;
 
-    for (const [method, operation] of Object.entries(pathItem as Record<string, any>)) {
-      // Skip non-operation fields (e.g., 'parameters')
+    for (const [method, value] of Object.entries(pathItem)) {
+      // Skip non-operation fields (e.g., 'parameters', '$ref')
       if (!isHttpMethod(method)) continue;
-      if (!operation || typeof operation !== 'object') continue;
+      if (!value || typeof value !== 'object') continue;
+
+      const operation = value as OperationLike;
 
       // Skip routes with @SkipGlobalErrors()
       if (operation['x-skip-global-errors'] === true) continue;
@@ -87,7 +116,7 @@ function buildErrorResponse(
   message: string,
   description: string,
   useProblemDetails: boolean,
-): Record<string, any> {
+): ResponseShape {
   if (useProblemDetails) {
     return {
       description,
@@ -128,7 +157,7 @@ function buildErrorResponse(
   };
 }
 
-function ensureErrorSchema(document: Record<string, any>, useProblemDetails: boolean): void {
+function ensureErrorSchema(document: OpenAPIDocumentLike, useProblemDetails: boolean): void {
   if (!document.components) document.components = {};
   if (!document.components.schemas) document.components.schemas = {};
 

@@ -1,7 +1,12 @@
-import { applyGlobalErrors } from './global-errors';
+import { applyGlobalErrors, OpenAPIDocumentLike } from './global-errors';
 import { SafeResponseModuleOptions } from '../interfaces';
 
-function createMinimalDocument(operations?: Record<string, any>): Record<string, any> {
+// Test helpers use Record<string, any> for deep-access assertions on OpenAPI
+// documents. The public API (applyGlobalErrors) accepts OpenAPIDocumentLike,
+// but test assertions need to inspect arbitrary nested properties like
+// doc.paths['/api/users'].get.responses['500'].content — which requires
+// unchecked property traversal that strict types cannot express.
+function createMinimalDocument(operations?: Record<string, any>): any {
   return {
     openapi: '3.0.0',
     info: { title: 'Test', version: '1.0' },
@@ -143,7 +148,7 @@ describe('applyGlobalErrors', () => {
   });
 
   it('should handle document without paths', () => {
-    const doc = { openapi: '3.0.0', info: { title: 'Test', version: '1.0' } };
+    const doc: any = { openapi: '3.0.0', info: { title: 'Test', version: '1.0' } };
     const options: SafeResponseModuleOptions = {
       swagger: { globalErrors: [500] },
     };
@@ -153,7 +158,7 @@ describe('applyGlobalErrors', () => {
   });
 
   it('should ensure SafeErrorResponseDto schema exists in components', () => {
-    const doc: Record<string, any> = {
+    const doc: any = {
       openapi: '3.0.0',
       paths: { '/test': { get: { responses: {} } } },
     };
@@ -179,7 +184,7 @@ describe('applyGlobalErrors', () => {
   });
 
   it('should handle multiple paths', () => {
-    const doc: Record<string, any> = {
+    const doc: any = {
       openapi: '3.0.0',
       paths: {
         '/api/users': { get: { responses: {} } },
@@ -225,7 +230,7 @@ describe('applyGlobalErrors', () => {
   });
 
   it('should handle operations without responses field', () => {
-    const doc: Record<string, any> = {
+    const doc: any = {
       openapi: '3.0.0',
       paths: { '/test': { get: {} } },
       components: { schemas: {} },
@@ -271,7 +276,7 @@ describe('applyGlobalErrors', () => {
     });
 
     it('should ensure ProblemDetailsDto schema in components', () => {
-      const doc: Record<string, any> = {
+      const doc: any = {
         openapi: '3.0.0',
         paths: { '/test': { get: { responses: {} } } },
       };

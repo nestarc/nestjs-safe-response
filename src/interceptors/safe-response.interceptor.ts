@@ -66,6 +66,8 @@ export class SafeResponseInterceptor implements NestInterceptor {
     this.getI18nAdapter = createI18nAdapterResolver(options.i18n, moduleRef);
   }
 
+  // NestInterceptor interface requires Observable<any> — cannot narrow to
+  // Observable<SafeSuccessResponse> without breaking the contract.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
     if (context.getType() !== 'http') {

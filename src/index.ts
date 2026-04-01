@@ -73,4 +73,4 @@ export {
 export { DEFAULT_ERROR_CODE_MAP, DEFAULT_PROBLEM_TITLE_MAP, CURSOR_PAGINATED_KEY, PROBLEM_TYPE_KEY, SORT_META_KEY, FILTER_META_KEY, SKIP_GLOBAL_ERRORS_KEY } from './constants';
 
 // Swagger utilities
-export { applyGlobalErrors } from './swagger/global-errors';
+export { applyGlobalErrors, OpenAPIDocumentLike } from './swagger/global-errors';
