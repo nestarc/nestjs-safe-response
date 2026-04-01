@@ -139,3 +139,49 @@ export function isCursorPagination(
 ): pagination is CursorPaginationMeta {
   return 'type' in pagination && pagination.type === 'cursor';
 }
+
+/** Check if a response is an RFC 9457 Problem Details response */
+export function isProblemDetailsResponse(
+  res: unknown,
+): res is SafeProblemDetailsResponse {
+  if (typeof res !== 'object' || res === null) return false;
+  const obj = res as Record<string, unknown>;
+  return (
+    typeof obj.type === 'string' &&
+    typeof obj.title === 'string' &&
+    typeof obj.status === 'number' &&
+    typeof obj.detail === 'string' &&
+    typeof obj.instance === 'string'
+  );
+}
+
+/** Check if response meta contains a response time measurement */
+export function hasResponseTime(
+  meta?: ResponseMeta | { responseTime?: number; [key: string]: unknown },
+): meta is ResponseMeta & { responseTime: number } {
+  return meta?.responseTime !== undefined && typeof meta.responseTime === 'number';
+}
+
+/** Check if response meta contains sort information with valid shape */
+export function hasSort(
+  meta?: ResponseMeta,
+): meta is ResponseMeta & { sort: SortInfo } {
+  if (!meta?.sort || typeof meta.sort !== 'object') return false;
+  const sort = meta.sort as unknown as Record<string, unknown>;
+  return (
+    typeof sort.field === 'string' &&
+    (sort.order === 'asc' || sort.order === 'desc')
+  );
+}
+
+/** Check if response meta contains filter information with valid shape */
+export function hasFilters(
+  meta?: ResponseMeta,
+): meta is ResponseMeta & { filters: Record<string, unknown> } {
+  return (
+    meta?.filters !== undefined &&
+    typeof meta.filters === 'object' &&
+    meta.filters !== null &&
+    !Array.isArray(meta.filters)
+  );
+}

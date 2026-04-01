@@ -55,7 +55,7 @@ export class SafeResponseModule implements OnModuleInit {
       providers: [
         {
           provide: SAFE_RESPONSE_OPTIONS,
-          useFactory: async (...args: any[]) =>
+          useFactory: async (...args: unknown[]) =>
             (await options.useFactory(...args)) ?? {},
           inject: options.inject ?? [],
         },

@@ -10,11 +10,20 @@ export interface I18nAdapter {
 }
 
 /**
+ * Minimal interface for nestjs-i18n's I18nService.
+ * Requires only the `translate()` method, making it structurally compatible
+ * with nestjs-i18n v10+ without importing the package at compile time.
+ */
+export interface I18nServiceLike {
+  translate(key: string, options?: { lang?: string; args?: Record<string, unknown> }): unknown;
+}
+
+/**
  * Built-in adapter for nestjs-i18n.
  * Wraps I18nService from the nestjs-i18n package.
  */
 export class NestI18nAdapter implements I18nAdapter {
-  constructor(private readonly i18nService: any) {}
+  constructor(private readonly i18nService: I18nServiceLike) {}
 
   translate(key: string, options?: { lang?: string; args?: Record<string, unknown> }): string {
     try {
@@ -32,8 +41,18 @@ export class NestI18nAdapter implements I18nAdapter {
   resolveLanguage(request: unknown): string {
     try {
       // nestjs-i18n stores the resolved language on the request object
-      const req = request as any;
-      return req.i18nLang ?? req.headers?.['accept-language']?.split(',')[0]?.trim() ?? 'en';
+      if (request && typeof request === 'object') {
+        const req = request as Record<string, unknown>;
+        if (typeof req.i18nLang === 'string') return req.i18nLang;
+        // Fallback: check Accept-Language header
+        const headers = req.headers as Record<string, string | string[] | undefined> | undefined;
+        const acceptLang = headers?.['accept-language'];
+        if (typeof acceptLang === 'string') {
+          const lang = acceptLang.split(',')[0]?.trim();
+          if (lang) return lang;
+        }
+      }
+      return 'en';
     } catch {
       return 'en';
     }

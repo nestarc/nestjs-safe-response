@@ -22,7 +22,7 @@ Standardized API response wrapper for NestJS — auto-wraps success/error respon
 - **RFC 9457 Problem Details** — opt-in standard error format with `application/problem+json`
 - **Swagger integration** — `@ApiSafeResponse(Dto)` for success schemas, `@ApiSafeErrorResponse()` / `@ApiSafeErrorResponses()` for error schemas — all with the wrapped envelope
 - **Global error Swagger** — `applyGlobalErrors()` injects common error responses (401, 403, 500) into all OpenAPI operations
-- **Frontend client types** — `nestjs-safe-response/client` provides zero-dependency TypeScript types and type guards for frontend consumers
+- **Frontend client types** — `nestjs-safe-response/client` provides zero-dependency TypeScript types and type guards (`isSuccess`, `isError`, `isPaginated`, `isProblemDetailsResponse`, `hasResponseTime`, `hasSort`, `hasFilters`) for frontend consumers
 - **nestjs-i18n integration** — automatic error/success message translation via adapter pattern
 - **nestjs-cls integration** — inject CLS store values (traceId, correlationId) into response `meta`
 - **class-validator support** — validation errors parsed into `details` array with "Validation failed" message
@@ -547,11 +547,11 @@ This library is built with multiple layers of verification to ensure production 
 
 | Category | Count | What it covers |
 |----------|-------|----------------|
-| Unit tests | 278 | Interceptor, Exception Filter, Module DI, Decorators, Client Type Guards, i18n Adapter, Global Errors |
-| E2E tests (Express) | 45 | Full HTTP request/response cycle including all v0.9.0 features |
-| E2E tests (Fastify) | 14 | Platform parity verification with v0.9.0 features |
-| E2E tests (Swagger) | 41 | OpenAPI schema output verification including Problem Details and Global Errors |
-| Type tests | 72 | Public API type signature via `tsd` including client types and v0.9.0 options |
+| Unit tests | 333 | Interceptor, Exception Filter, Module DI, Decorators, Client Type Guards, i18n Adapter, Global Errors, Shared Utilities |
+| E2E tests (Express) | 44 | Full HTTP request/response cycle including all v0.10.0 features |
+| E2E tests (Fastify) | 44 | Full platform parity with Express — all features verified on Fastify |
+| E2E tests (Swagger) | 40 | OpenAPI schema output verification including Problem Details and Global Errors |
+| Type tests | 84 | Public API type signature via `tsd` including client type guards and v0.10.0 additions |
 | Snapshots | 2 | Swagger `components/schemas` + `paths` regression detection |
 
 ```bash

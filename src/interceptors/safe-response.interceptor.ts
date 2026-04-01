@@ -9,7 +9,7 @@ import {
 import { ModuleRef, Reflector } from '@nestjs/core';
 import { Observable, map } from 'rxjs';
 import { randomUUID } from 'node:crypto';
-import { I18nAdapter, NestI18nAdapter } from '../adapters/i18n.adapter';
+import { I18nAdapter } from '../adapters/i18n.adapter';
 import {
   SAFE_RESPONSE_OPTIONS,
   RAW_RESPONSE_KEY,
@@ -33,11 +33,26 @@ import {
   CursorPaginationMeta,
   RequestIdOptions,
 } from '../interfaces';
+import {
+  REQUEST_WRAPPED,
+  REQUEST_PROBLEM_TYPE,
+  REQUEST_START_TIME,
+  REQUEST_ID,
+} from '../shared/request-state';
+import {
+  SafeHttpRequest,
+  SafeHttpResponse,
+  createClsServiceResolver,
+  createI18nAdapterResolver,
+  resolveContextMeta,
+  sanitizeRequestId,
+  setResponseHeader,
+} from '../shared/response-helpers';
 
 @Injectable()
 export class SafeResponseInterceptor implements NestInterceptor {
-  private _clsService: any = undefined; // undefined=not resolved, null=unavailable
-  private _i18nAdapter: I18nAdapter | null | undefined = undefined;
+  private readonly getClsService: () => unknown | null;
+  private readonly getI18nAdapter: () => I18nAdapter | null;
 
   constructor(
     private readonly reflector: Reflector,
@@ -46,76 +61,12 @@ export class SafeResponseInterceptor implements NestInterceptor {
     private readonly options: SafeResponseModuleOptions = {},
     @Optional()
     private readonly moduleRef?: ModuleRef,
-  ) {}
-
-  private resolveClsService(): any {
-    if (this._clsService === undefined) {
-      if (!this.options.context || !this.moduleRef) {
-        this._clsService = null;
-        return null;
-      }
-      try {
-        const { ClsService } = require('nestjs-cls');
-        this._clsService = this.moduleRef.get(ClsService, { strict: false }) ?? null;
-      } catch {
-        this._clsService = null;
-      }
-    }
-    return this._clsService;
+  ) {
+    this.getClsService = createClsServiceResolver(options.context, moduleRef);
+    this.getI18nAdapter = createI18nAdapterResolver(options.i18n, moduleRef);
   }
 
-  private resolveI18nAdapter(): I18nAdapter | null {
-    if (this._i18nAdapter === undefined) {
-      if (!this.options.i18n) {
-        this._i18nAdapter = null;
-      } else if (typeof this.options.i18n === 'object') {
-        this._i18nAdapter = this.options.i18n;
-      } else if (this.options.i18n === true && this.moduleRef) {
-        try {
-          const { I18nService } = require('nestjs-i18n');
-          const service = this.moduleRef.get(I18nService, { strict: false });
-          this._i18nAdapter = service ? new NestI18nAdapter(service) : null;
-        } catch {
-          this._i18nAdapter = null;
-        }
-      } else {
-        this._i18nAdapter = null;
-      }
-    }
-    return this._i18nAdapter;
-  }
-
-  private resolveContextMeta(request: any): Record<string, unknown> | undefined {
-    const contextOpts = this.options.context;
-    if (!contextOpts) return undefined;
-
-    const clsService = this.resolveClsService();
-    if (!clsService) return undefined;
-
-    if (contextOpts.resolver) {
-      try {
-        return contextOpts.resolver(clsService);
-      } catch {
-        return undefined;
-      }
-    }
-
-    if (contextOpts.fields) {
-      const result: Record<string, unknown> = {};
-      let hasValue = false;
-      for (const [metaField, clsKey] of Object.entries(contextOpts.fields)) {
-        const value = clsService.get(clsKey);
-        if (value !== undefined && value !== null) {
-          result[metaField] = value;
-          hasValue = true;
-        }
-      }
-      return hasValue ? result : undefined;
-    }
-
-    return undefined;
-  }
-
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
     if (context.getType() !== 'http') {
       return next.handle();
@@ -132,11 +83,11 @@ export class SafeResponseInterceptor implements NestInterceptor {
 
     // Idempotency guard: skip if another instance already marked this request
     const httpCtxEarly = context.switchToHttp();
-    const requestEarly = httpCtxEarly.getRequest();
-    if (requestEarly.__safeResponseWrapped) {
+    const requestEarly = httpCtxEarly.getRequest<SafeHttpRequest>();
+    if (requestEarly[REQUEST_WRAPPED]) {
       return next.handle();
     }
-    requestEarly.__safeResponseWrapped = true;
+    requestEarly[REQUEST_WRAPPED] = true;
 
     const paginatedOptions = this.reflector.get<PaginatedOptions | true>(
       PAGINATED_KEY,
@@ -164,9 +115,9 @@ export class SafeResponseInterceptor implements NestInterceptor {
     );
 
     const httpCtx = context.switchToHttp();
-    const request = httpCtx.getRequest();
-    const responseObj = httpCtx.getResponse();
-    const statusCode = responseObj.statusCode;
+    const request = httpCtx.getRequest<SafeHttpRequest>();
+    const responseObj = httpCtx.getResponse<SafeHttpResponse>();
+    const statusCode = (responseObj as { statusCode: number }).statusCode;
 
     // Resolve request ID (once per request, shared with filter)
     const requestId = this.resolveRequestId(request, responseObj);
@@ -178,7 +129,7 @@ export class SafeResponseInterceptor implements NestInterceptor {
       context.getHandler(),
     );
     if (problemType) {
-      request.__safeResponseProblemType = problemType;
+      request[REQUEST_PROBLEM_TYPE] = problemType;
     }
 
     // Capture start time for response time calculation (shared with filter)
@@ -186,7 +137,7 @@ export class SafeResponseInterceptor implements NestInterceptor {
     let startTime: number | undefined;
     if (includeResponseTime) {
       startTime = performance.now();
-      request.__safeResponseStartTime = startTime;
+      request[REQUEST_START_TIME] = startTime;
     }
 
     return next.handle().pipe(
@@ -215,7 +166,7 @@ export class SafeResponseInterceptor implements NestInterceptor {
           const pagination = this.calculatePagination(data, opts);
           if (opts.links) {
             pagination.links = this.buildOffsetLinks(
-              request.url,
+              request.url ?? '',
               pagination.page,
               pagination.limit,
               pagination.totalPages,
@@ -231,7 +182,7 @@ export class SafeResponseInterceptor implements NestInterceptor {
           const pagination = this.calculateCursorPagination(data, opts);
           if (opts.links) {
             pagination.links = this.buildCursorLinks(
-              request.url,
+              request.url ?? '',
               pagination.nextCursor,
               pagination.previousCursor,
               pagination.limit,
@@ -254,7 +205,7 @@ export class SafeResponseInterceptor implements NestInterceptor {
 
         if (customMessage) {
           // Translate message if i18n is enabled
-          const i18nAdapter = this.resolveI18nAdapter();
+          const i18nAdapter = this.getI18nAdapter();
           const message = i18nAdapter
             ? i18nAdapter.translate(customMessage, { lang: i18nAdapter.resolveLanguage(request) })
             : customMessage;
@@ -262,7 +213,7 @@ export class SafeResponseInterceptor implements NestInterceptor {
         }
 
         // Inject CLS context fields into meta
-        const contextMeta = this.resolveContextMeta(request);
+        const contextMeta = resolveContextMeta(this.options.context, this.getClsService);
         if (contextMeta) {
           response.meta = { ...response.meta, ...contextMeta };
         }
@@ -293,8 +244,8 @@ export class SafeResponseInterceptor implements NestInterceptor {
   }
 
   private resolveRequestId(
-    request: any,
-    response: any,
+    request: SafeHttpRequest,
+    response: SafeHttpResponse,
   ): string | undefined {
     const opts = this.options.requestId;
     if (!opts) return undefined;
@@ -303,7 +254,7 @@ export class SafeResponseInterceptor implements NestInterceptor {
     const headerName = (config.headerName ?? 'X-Request-Id').toLowerCase();
 
     // Check incoming header first (with validation)
-    let id: string | undefined = this.sanitizeRequestId(
+    let id: string | undefined = sanitizeRequestId(
       request.headers?.[headerName],
     );
     if (!id) {
@@ -312,14 +263,10 @@ export class SafeResponseInterceptor implements NestInterceptor {
 
     // Set response header for downstream tracking
     const headerNameOut = config.headerName ?? 'X-Request-Id';
-    if (typeof response.setHeader === 'function') {
-      response.setHeader(headerNameOut, id);
-    } else if (typeof response.header === 'function') {
-      response.header(headerNameOut, id);
-    }
+    setResponseHeader(response, headerNameOut, id);
 
     // Store on request for filter to read
-    request.__safeResponseRequestId = id;
+    request[REQUEST_ID] = id;
 
     return id;
   }
@@ -376,14 +323,6 @@ export class SafeResponseInterceptor implements NestInterceptor {
       hasNext: result.page < totalPages,
       hasPrev: result.page > 1,
     };
-  }
-
-  /** Validate and sanitize incoming request ID header (max 128 chars, safe characters only) */
-  private sanitizeRequestId(value: unknown): string | undefined {
-    const raw = Array.isArray(value) ? value[0] : value;
-    if (typeof raw !== 'string' || raw.length === 0) return undefined;
-    const sanitized = raw.slice(0, 128).replace(/[^a-zA-Z0-9\-_.~]/g, '');
-    return sanitized.length > 0 ? sanitized : undefined;
   }
 
   private calculateCursorPagination(
@@ -456,8 +395,15 @@ export class SafeResponseInterceptor implements NestInterceptor {
     });
     firstUrl.searchParams.set('limit', String(limit));
 
+    // Build self link with normalized limit (consistent with meta.pagination.limit)
+    const selfUrl = new URL(base.pathname, 'http://localhost');
+    base.searchParams.forEach((v, k) => {
+      if (k !== 'limit') selfUrl.searchParams.set(k, v);
+    });
+    selfUrl.searchParams.set('limit', String(limit));
+
     return {
-      self: base.pathname + base.search,
+      self: selfUrl.pathname + selfUrl.search,
       first: firstUrl.pathname + firstUrl.search,
       prev: buildUrl(previousCursor),
       next: buildUrl(nextCursor),

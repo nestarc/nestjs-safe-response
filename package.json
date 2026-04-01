@@ -1,6 +1,6 @@
 {
   "name": "nestjs-safe-response",
-  "version": "0.9.0",
+  "version": "0.10.0",
   "description": "Standardized API response wrapper for NestJS with Swagger integration, pagination, and custom error code mapping",
   "author": "ksyq12",
   "license": "MIT",

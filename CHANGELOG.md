@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.10.0] - 2026-04-01
+
+### Added
+- **Client type guards** — `isProblemDetailsResponse()`, `hasResponseTime()`, `hasSort()`, `hasFilters()` in `nestjs-safe-response/client` for discriminating RFC 9457 responses and checking response meta field presence.
+- **Fastify E2E test parity** — 30 new Fastify E2E tests covering cursor pagination, request ID tracking, sort/filter metadata, custom date formatter, transformResponse, success code mapping, edge cases, and `@Exclude()` interop. Fastify E2E now matches Express at 44 tests each.
+- `I18nServiceLike` interface export — minimal structural type for nestjs-i18n's `I18nService`, enabling type-safe adapter construction without compile-time dependency.
+- Internal: shared utility module (`src/shared/`) with `createClsServiceResolver()`, `createI18nAdapterResolver()`, `resolveContextMeta()`, `sanitizeRequestId()`, `setResponseHeader()` — eliminates ~160 lines of duplication between interceptor and filter.
+- Internal: Symbol-based request state constants (`REQUEST_WRAPPED`, `REQUEST_ID`, `REQUEST_START_TIME`, `REQUEST_PROBLEM_TYPE`, `REQUEST_ERROR_HANDLED`) replacing magic string properties for safer cross-component communication.
+- Internal: platform-neutral `SafeHttpRequest` / `SafeHttpResponse` interfaces for Express/Fastify compatibility without `any`.
+- 55 new unit tests (shared utilities + client type guards + cursor link clamping), 12 new type-level tests.
+
+### Changed
+- **Type safety** — replaced 13 internal `any` types with `unknown`, proper interfaces, and type narrowing. `NestI18nAdapter` constructor now accepts `I18nServiceLike` (previously `any`). `SafeResponseModuleAsyncOptions.useFactory` and `inject` retain `any[]` for NestJS DI compatibility.
+- Interceptor refactored: 467 → 388 lines. Filter refactored: 306 → 228 lines. Shared logic extracted to `src/shared/response-helpers.ts`.
+- CLS and i18n service resolution now uses factory-based closures instead of mutable class fields, improving testability and eliminating `any`-typed instance variables.
+
+### Fixed
+- **Cursor pagination self link**: `links.self` now uses the clamped `limit` value (consistent with `meta.pagination.limit`) instead of preserving the original query parameter. Previously, when `maxLimit` was set, `meta.pagination.limit` and `links.self` could show different values.
+
 ## [0.9.0] - 2026-03-31
 
 ### Added

@@ -11,6 +11,7 @@ import {
 import { HttpAdapterHost } from '@nestjs/core';
 import { SafeExceptionFilter } from './safe-exception.filter';
 import { SafeResponseModuleOptions } from '../interfaces';
+import { REQUEST_ERROR_HANDLED, REQUEST_START_TIME, REQUEST_PROBLEM_TYPE, REQUEST_ID } from '../shared/request-state';
 
 function createMockHttpAdapterHost(url = '/test', method = 'GET') {
   const replyFn = jest.fn();
@@ -49,7 +50,7 @@ function createMockArgumentsHostWithRequestId(options: {
     headers: options.headers ?? {},
   };
   if (options.storedRequestId) {
-    mockRequest.__safeResponseRequestId = options.storedRequestId;
+    (mockRequest as any)[REQUEST_ID] = options.storedRequestId;
   }
   const mockResponse = { setHeader: setHeaderFn };
 
@@ -627,7 +628,7 @@ describe('SafeExceptionFilter', () => {
       const filter = createFilter(adapterHost, { responseTime: true });
       const mockRequest: Record<string, unknown> = {
         headers: {},
-        __safeResponseStartTime: performance.now() - 50,
+        [REQUEST_START_TIME]: performance.now() - 50,
       };
       const mockResponse = { setHeader: jest.fn() };
       const host = {
@@ -673,7 +674,7 @@ describe('SafeExceptionFilter', () => {
       const filter = createFilter(adapterHost, { responseTime: true });
       const mockRequest: Record<string, unknown> = {
         headers: {},
-        __safeResponseStartTime: performance.now() - 100,
+        [REQUEST_START_TIME]: performance.now() - 100,
       };
       const mockResponse = { setHeader: jest.fn() };
       const host = {
@@ -695,8 +696,8 @@ describe('SafeExceptionFilter', () => {
       const filter = createFilter(adapterHost, { responseTime: true, requestId: true });
       const mockRequest: Record<string, unknown> = {
         headers: {},
-        __safeResponseStartTime: performance.now() - 10,
-        __safeResponseRequestId: 'test-req-id',
+        [REQUEST_START_TIME]: performance.now() - 10,
+        [REQUEST_ID]: 'test-req-id',
       };
       const mockResponse = { setHeader: jest.fn() };
       const host = {
@@ -770,7 +771,7 @@ describe('SafeExceptionFilter', () => {
       const filter = createFilter(adapterHost, { problemDetails: true });
       const mockRequest: Record<string, unknown> = {
         headers: {},
-        __safeResponseProblemType: 'https://api.example.com/problems/user-not-found',
+        [REQUEST_PROBLEM_TYPE]: 'https://api.example.com/problems/user-not-found',
       };
       const mockResponse = { setHeader: jest.fn() };
       const host = {
@@ -881,7 +882,7 @@ describe('SafeExceptionFilter', () => {
       });
       const mockRequest: Record<string, unknown> = {
         headers: {},
-        __safeResponseStartTime: performance.now() - 25,
+        [REQUEST_START_TIME]: performance.now() - 25,
       };
       const mockResponse = { setHeader: jest.fn() };
       const host = {
@@ -928,12 +929,12 @@ describe('SafeExceptionFilter', () => {
   // ─── Idempotency Guard ───
 
   describe('중복 등록 방어 (idempotency guard)', () => {
-    it('__safeResponseErrorHandled가 이미 true → 예외를 그대로 throw', () => {
+    it('[REQUEST_ERROR_HANDLED]가 이미 true → 예외를 그대로 throw', () => {
       const { adapterHost, replyFn } = createMockHttpAdapterHost();
       const filter = createFilter(adapterHost);
       const mockRequest: Record<string, unknown> = {
         headers: {},
-        __safeResponseErrorHandled: true,
+        [REQUEST_ERROR_HANDLED]: true,
       };
       const mockResponse = { setHeader: jest.fn() };
       const host = {
@@ -950,7 +951,7 @@ describe('SafeExceptionFilter', () => {
       expect(replyFn).not.toHaveBeenCalled();
     });
 
-    it('첫 번째 호출 → __safeResponseErrorHandled 설정됨', () => {
+    it('첫 번째 호출 → [REQUEST_ERROR_HANDLED] 설정됨', () => {
       const { adapterHost } = createMockHttpAdapterHost();
       const filter = createFilter(adapterHost);
       const host = createMockArgumentsHost();
@@ -958,7 +959,7 @@ describe('SafeExceptionFilter', () => {
       filter.catch(new BadRequestException(), host);
 
       const mockRequest = (host as any).switchToHttp().getRequest();
-      expect(mockRequest.__safeResponseErrorHandled).toBe(true);
+      expect((mockRequest as any)[REQUEST_ERROR_HANDLED]).toBe(true);
     });
   });
 
@@ -1081,7 +1082,7 @@ describe('SafeExceptionFilter', () => {
       const host = createMockArgumentsHost();
       // Set start time on request to simulate interceptor
       const mockRequest = (host as any).switchToHttp().getRequest();
-      mockRequest.__safeResponseStartTime = performance.now() - 50;
+      (mockRequest as any)[REQUEST_START_TIME] = performance.now() - 50;
 
       filter.catch(new NotFoundException(), host);
 

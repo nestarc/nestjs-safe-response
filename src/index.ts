@@ -52,7 +52,7 @@ export type {
 } from './interfaces';
 
 // Adapters
-export { I18nAdapter, NestI18nAdapter } from './adapters/i18n.adapter';
+export { I18nAdapter, I18nServiceLike, NestI18nAdapter } from './adapters/i18n.adapter';
 
 // DTOs (for Swagger)
 export {

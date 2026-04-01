@@ -258,6 +258,14 @@ import type {
   ResponseMeta as ClientMeta,
   SortInfo as ClientSort,
 } from './dist/client';
+import {
+  isSuccess as clientIsSuccess,
+  isError as clientIsError,
+  isProblemDetailsResponse,
+  hasResponseTime,
+  hasSort,
+  hasFilters,
+} from './dist/client';
 
 // Client SafeSuccessResponse should have data field
 const clientSuccess: ClientSuccess<{ id: number }> = {
@@ -306,3 +314,41 @@ expectAssignable<ClientMeta>(clientMeta);
 const clientSort: ClientSort = { field: 'createdAt', order: 'desc' };
 expectType<string>(clientSort.field);
 expectAssignable<'asc' | 'desc'>(clientSort.order);
+
+// ─── Client Type Guards (v0.10.0) ────────────────────────────────
+
+// isProblemDetailsResponse narrows to SafeProblemDetailsResponse
+const unknownRes: unknown = {};
+if (isProblemDetailsResponse(unknownRes)) {
+  expectType<string>(unknownRes.type);
+  expectType<string>(unknownRes.title);
+  expectType<number>(unknownRes.status);
+  expectType<string>(unknownRes.detail);
+  expectType<string>(unknownRes.instance);
+  expectType<string | undefined>(unknownRes.code);
+  expectType<string | undefined>(unknownRes.requestId);
+}
+
+// hasResponseTime narrows meta to include responseTime: number
+const metaWithTime: ClientMeta = { responseTime: 42 };
+if (hasResponseTime(metaWithTime)) {
+  expectType<number>(metaWithTime.responseTime);
+}
+
+// hasSort narrows meta to include sort: SortInfo
+const metaWithSort: ClientMeta = { sort: { field: 'name', order: 'asc' } };
+if (hasSort(metaWithSort)) {
+  expectType<ClientSort>(metaWithSort.sort);
+  expectType<string>(metaWithSort.sort.field);
+}
+
+// hasFilters narrows meta to include filters: Record<string, unknown>
+const metaWithFilters: ClientMeta = { filters: { status: 'active' } };
+if (hasFilters(metaWithFilters)) {
+  expectType<Record<string, unknown>>(metaWithFilters.filters);
+}
+
+// Guards return false for undefined meta
+expectType<boolean>(hasResponseTime(undefined));
+expectType<boolean>(hasSort(undefined));
+expectType<boolean>(hasFilters(undefined));

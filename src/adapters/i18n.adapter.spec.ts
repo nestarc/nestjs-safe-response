@@ -82,35 +82,35 @@ describe('NestI18nAdapter', () => {
 
   describe('resolveLanguage', () => {
     it('should read i18nLang from request', () => {
-      const adapter = new NestI18nAdapter({});
+      const adapter = new NestI18nAdapter({} as any);
       const request = { i18nLang: 'ko' };
 
       expect(adapter.resolveLanguage(request)).toBe('ko');
     });
 
     it('should fallback to accept-language header', () => {
-      const adapter = new NestI18nAdapter({});
+      const adapter = new NestI18nAdapter({} as any);
       const request = { headers: { 'accept-language': 'ja,en;q=0.9' } };
 
       expect(adapter.resolveLanguage(request)).toBe('ja');
     });
 
     it('should default to "en" when no language found', () => {
-      const adapter = new NestI18nAdapter({});
+      const adapter = new NestI18nAdapter({} as any);
       const request = { headers: {} };
 
       expect(adapter.resolveLanguage(request)).toBe('en');
     });
 
     it('should handle null/undefined request gracefully', () => {
-      const adapter = new NestI18nAdapter({});
+      const adapter = new NestI18nAdapter({} as any);
 
       expect(adapter.resolveLanguage(null)).toBe('en');
       expect(adapter.resolveLanguage(undefined)).toBe('en');
     });
 
     it('should prefer i18nLang over accept-language header', () => {
-      const adapter = new NestI18nAdapter({});
+      const adapter = new NestI18nAdapter({} as any);
       const request = {
         i18nLang: 'ko',
         headers: { 'accept-language': 'ja' },

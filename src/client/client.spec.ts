@@ -4,8 +4,13 @@ import {
   isPaginated,
   isOffsetPagination,
   isCursorPagination,
+  isProblemDetailsResponse,
+  hasResponseTime,
+  hasSort,
+  hasFilters,
   SafeSuccessResponse,
   SafeErrorResponse,
+  SafeProblemDetailsResponse,
   SafeResponse,
   PaginationMeta,
   CursorPaginationMeta,
@@ -239,6 +244,178 @@ describe('Client Type Guards', () => {
         totalCount: 42,
       };
       expect(isCursorPagination(pagination)).toBe(true);
+    });
+  });
+
+  // ─── isProblemDetailsResponse ──────────────────────────────────
+
+  describe('isProblemDetailsResponse', () => {
+    it('should return true for valid problem details', () => {
+      const res = {
+        type: 'https://api.example.com/problems/not-found',
+        title: 'Not Found',
+        status: 404,
+        detail: 'User with ID 123 not found',
+        instance: '/api/users/123',
+      };
+      expect(isProblemDetailsResponse(res)).toBe(true);
+    });
+
+    it('should return false for success response', () => {
+      const res: SafeResponse = {
+        success: true,
+        statusCode: 200,
+        data: {},
+      };
+      expect(isProblemDetailsResponse(res)).toBe(false);
+    });
+
+    it('should return false for standard error response', () => {
+      const res: SafeErrorResponse = {
+        success: false,
+        statusCode: 404,
+        error: { code: 'NOT_FOUND', message: 'Not found' },
+      };
+      expect(isProblemDetailsResponse(res)).toBe(false);
+    });
+
+    it('should return false for null', () => {
+      expect(isProblemDetailsResponse(null)).toBe(false);
+    });
+
+    it('should return false for undefined', () => {
+      expect(isProblemDetailsResponse(undefined)).toBe(false);
+    });
+
+    it('should return true with optional fields (code, requestId, details, meta)', () => {
+      const res: SafeProblemDetailsResponse = {
+        type: 'about:blank',
+        title: 'Internal Server Error',
+        status: 500,
+        detail: 'Something went wrong',
+        instance: '/api/data',
+        code: 'INTERNAL_SERVER_ERROR',
+        requestId: 'abc-123',
+        details: ['detail1'],
+        meta: { responseTime: 42 },
+      };
+      expect(isProblemDetailsResponse(res)).toBe(true);
+    });
+
+    it('should return false when required fields have wrong types', () => {
+      const res = {
+        type: 'https://example.com',
+        title: 'Test',
+        status: '404', // string instead of number
+        detail: 'Test',
+        instance: '/api/test',
+      };
+      expect(isProblemDetailsResponse(res)).toBe(false);
+    });
+
+    it('should return false when instance is missing', () => {
+      const res = {
+        type: 'about:blank',
+        title: 'Not Found',
+        status: 404,
+        detail: 'Resource not found',
+        // instance is missing
+      };
+      expect(isProblemDetailsResponse(res)).toBe(false);
+    });
+
+    it('should return false for partial object (only type and title)', () => {
+      const res = { type: 'about:blank', title: 'Error' };
+      expect(isProblemDetailsResponse(res)).toBe(false);
+    });
+  });
+
+  // ─── hasResponseTime ──────────────────────────────────────────
+
+  describe('hasResponseTime', () => {
+    it('should return true when responseTime is present', () => {
+      const meta: ResponseMeta = { responseTime: 42 };
+      expect(hasResponseTime(meta)).toBe(true);
+    });
+
+    it('should return false when responseTime is absent', () => {
+      const meta: ResponseMeta = { message: 'hello' };
+      expect(hasResponseTime(meta)).toBe(false);
+    });
+
+    it('should return false for undefined meta', () => {
+      expect(hasResponseTime(undefined)).toBe(false);
+    });
+
+    it('should work with error response meta shape', () => {
+      const meta = { responseTime: 15 };
+      expect(hasResponseTime(meta)).toBe(true);
+    });
+  });
+
+  // ─── hasSort ──────────────────────────────────────────────────
+
+  describe('hasSort', () => {
+    it('should return true when sort has valid shape', () => {
+      const meta: ResponseMeta = { sort: { field: 'name', order: 'asc' } };
+      expect(hasSort(meta)).toBe(true);
+    });
+
+    it('should return true for desc order', () => {
+      const meta: ResponseMeta = { sort: { field: 'createdAt', order: 'desc' } };
+      expect(hasSort(meta)).toBe(true);
+    });
+
+    it('should return false when sort is absent', () => {
+      const meta: ResponseMeta = { message: 'hello' };
+      expect(hasSort(meta)).toBe(false);
+    });
+
+    it('should return false for undefined meta', () => {
+      expect(hasSort(undefined)).toBe(false);
+    });
+
+    it('should return false for empty object sort (missing field/order)', () => {
+      const meta = { sort: {} } as unknown as ResponseMeta;
+      expect(hasSort(meta)).toBe(false);
+    });
+
+    it('should return false for sort with invalid order value', () => {
+      const meta = { sort: { field: 'name', order: 'random' } } as unknown as ResponseMeta;
+      expect(hasSort(meta)).toBe(false);
+    });
+
+    it('should return false for sort with non-string field', () => {
+      const meta = { sort: { field: 123, order: 'asc' } } as unknown as ResponseMeta;
+      expect(hasSort(meta)).toBe(false);
+    });
+  });
+
+  // ─── hasFilters ───────────────────────────────────────────────
+
+  describe('hasFilters', () => {
+    it('should return true when filters is a valid object', () => {
+      const meta: ResponseMeta = { filters: { status: 'active', role: 'admin' } };
+      expect(hasFilters(meta)).toBe(true);
+    });
+
+    it('should return false when filters is absent', () => {
+      const meta: ResponseMeta = { message: 'hello' };
+      expect(hasFilters(meta)).toBe(false);
+    });
+
+    it('should return false for undefined meta', () => {
+      expect(hasFilters(undefined)).toBe(false);
+    });
+
+    it('should return false for array filters (not a record)', () => {
+      const meta = { filters: ['active'] } as unknown as ResponseMeta;
+      expect(hasFilters(meta)).toBe(false);
+    });
+
+    it('should return true for empty object filters', () => {
+      const meta: ResponseMeta = { filters: {} };
+      expect(hasFilters(meta)).toBe(true);
     });
   });
 });

@@ -4,6 +4,7 @@ import { of, lastValueFrom } from 'rxjs';
 import { SafeResponseInterceptor } from './safe-response.interceptor';
 import { RAW_RESPONSE_KEY, PAGINATED_KEY, CURSOR_PAGINATED_KEY, RESPONSE_MESSAGE_KEY, SUCCESS_CODE_KEY, PROBLEM_TYPE_KEY, SORT_META_KEY, FILTER_META_KEY } from '../constants';
 import { SafeResponseModuleOptions } from '../interfaces';
+import { REQUEST_WRAPPED, REQUEST_PROBLEM_TYPE, REQUEST_START_TIME, REQUEST_ID } from '../shared/request-state';
 
 function createMockExecutionContext(overrides?: {
   url?: string;
@@ -875,7 +876,7 @@ describe('SafeResponseInterceptor', () => {
       );
     });
 
-    it('requestId: true → request에 __safeResponseRequestId 저장', async () => {
+    it('requestId: true → request에 [REQUEST_ID] 저장', async () => {
       jest.spyOn(reflector, 'get').mockReturnValue(undefined);
       const interceptor = createInterceptor({ requestId: true });
       const ctx = createMockExecutionContext();
@@ -885,7 +886,7 @@ describe('SafeResponseInterceptor', () => {
       );
 
       const mockRequest = (ctx as any).__mockRequest;
-      expect(mockRequest.__safeResponseRequestId).toBe(result.requestId);
+      expect((mockRequest as any)[REQUEST_ID]).toBe(result.requestId);
     });
 
     it('requestId: true + 헤더값이 모든 문자 무효 → 새 ID 생성', async () => {
@@ -1402,6 +1403,36 @@ describe('SafeResponseInterceptor', () => {
         expect(links.first).not.toContain('cursor=');
         expect(links.self).toContain('filter=active');
       });
+
+      it('maxLimit으로 클램핑된 limit이 self link에도 반영됨', async () => {
+        jest.spyOn(reflector, 'get').mockImplementation((key) => {
+          if (key === CURSOR_PAGINATED_KEY) return { links: true, maxLimit: 50 };
+          return undefined;
+        });
+        const interceptor = createInterceptor();
+        const ctx = createMockExecutionContext({
+          url: '/api/feed?cursor=abc&limit=100',
+        });
+        const data = {
+          data: [{ id: 1 }],
+          nextCursor: 'next-token',
+          previousCursor: null,
+          hasMore: true,
+          limit: 100, // exceeds maxLimit
+        };
+
+        const result = await lastValueFrom(
+          interceptor.intercept(ctx, createMockCallHandler(data)),
+        );
+
+        const links = (result.meta?.pagination as any)?.links;
+        expect(result.meta?.pagination?.limit).toBe(50);
+        // self link should use the clamped limit, not the original 100
+        expect(links.self).toContain('limit=50');
+        expect(links.self).not.toContain('limit=100');
+        expect(links.next).toContain('limit=50');
+        expect(links.first).toContain('limit=50');
+      });
     });
   });
 
@@ -1434,7 +1465,7 @@ describe('SafeResponseInterceptor', () => {
       expect(result.meta?.responseTime).toBeUndefined();
     });
 
-    it('responseTime: true → request에 __safeResponseStartTime 저장', async () => {
+    it('responseTime: true → request에 [REQUEST_START_TIME] 저장', async () => {
       jest.spyOn(reflector, 'get').mockReturnValue(undefined);
       const interceptor = createInterceptor({ responseTime: true });
       const ctx = createMockExecutionContext();
@@ -1444,7 +1475,7 @@ describe('SafeResponseInterceptor', () => {
       );
 
       const mockRequest = (ctx as any).__mockRequest;
-      expect(typeof mockRequest.__safeResponseStartTime).toBe('number');
+      expect(typeof (mockRequest as any)[REQUEST_START_TIME]).toBe('number');
     });
 
     it('responseTime: true + 페이지네이션 → pagination과 responseTime 공존', async () => {
@@ -1506,14 +1537,14 @@ describe('SafeResponseInterceptor', () => {
 
       expect(result).toEqual({ raw: true });
       const mockRequest = (ctx as any).__mockRequest;
-      expect(mockRequest.__safeResponseStartTime).toBeUndefined();
+      expect((mockRequest as any)[REQUEST_START_TIME]).toBeUndefined();
     });
   });
 
   // ─── ProblemType 메타데이터 전달 ───
 
   describe('ProblemType 메타데이터 전달', () => {
-    it('@ProblemType() → request에 __safeResponseProblemType 저장', async () => {
+    it('@ProblemType() → request에 [REQUEST_PROBLEM_TYPE] 저장', async () => {
       jest.spyOn(reflector, 'get').mockImplementation((key) => {
         if (key === PROBLEM_TYPE_KEY) return 'https://api.example.com/problems/user-not-found';
         return undefined;
@@ -1526,10 +1557,10 @@ describe('SafeResponseInterceptor', () => {
       );
 
       const mockRequest = (ctx as any).__mockRequest;
-      expect(mockRequest.__safeResponseProblemType).toBe('https://api.example.com/problems/user-not-found');
+      expect((mockRequest as any)[REQUEST_PROBLEM_TYPE]).toBe('https://api.example.com/problems/user-not-found');
     });
 
-    it('@ProblemType() 미설정 → __safeResponseProblemType 없음', async () => {
+    it('@ProblemType() 미설정 → [REQUEST_PROBLEM_TYPE] 없음', async () => {
       jest.spyOn(reflector, 'get').mockReturnValue(undefined);
       const interceptor = createInterceptor();
       const ctx = createMockExecutionContext();
@@ -1539,14 +1570,14 @@ describe('SafeResponseInterceptor', () => {
       );
 
       const mockRequest = (ctx as any).__mockRequest;
-      expect(mockRequest.__safeResponseProblemType).toBeUndefined();
+      expect((mockRequest as any)[REQUEST_PROBLEM_TYPE]).toBeUndefined();
     });
   });
 
   // ─── Idempotency Guard ───
 
   describe('중복 등록 방어 (idempotency guard)', () => {
-    it('__safeResponseWrapped가 이미 true → 래핑 스킵 (원본 반환)', async () => {
+    it('[REQUEST_WRAPPED]가 이미 true → 래핑 스킵 (원본 반환)', async () => {
       jest.spyOn(reflector, 'get').mockReturnValue(undefined);
       const interceptor = createInterceptor();
       const handler = () => {};
@@ -1554,7 +1585,7 @@ describe('SafeResponseInterceptor', () => {
       const mockRequest: Record<string, unknown> = {
         url: '/test',
         headers: {},
-        __safeResponseWrapped: true,
+        [REQUEST_WRAPPED]: true,
       };
       const mockResponse = { statusCode: 200, setHeader: setHeaderFn };
       const ctx = {
@@ -1578,7 +1609,7 @@ describe('SafeResponseInterceptor', () => {
       expect(result).not.toHaveProperty('statusCode');
     });
 
-    it('첫 번째 호출 → __safeResponseWrapped 설정됨', async () => {
+    it('첫 번째 호출 → [REQUEST_WRAPPED] 설정됨', async () => {
       jest.spyOn(reflector, 'get').mockReturnValue(undefined);
       const interceptor = createInterceptor();
       const ctx = createMockExecutionContext();
@@ -1588,7 +1619,7 @@ describe('SafeResponseInterceptor', () => {
       );
 
       const mockRequest = (ctx as any).__mockRequest;
-      expect(mockRequest.__safeResponseWrapped).toBe(true);
+      expect((mockRequest as any)[REQUEST_WRAPPED]).toBe(true);
     });
   });
 
