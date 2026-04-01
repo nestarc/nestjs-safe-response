@@ -8,7 +8,10 @@ import { SAFE_RESPONSE_OPTIONS } from './constants';
 
 describe('SafeResponseModule', () => {
   beforeEach(() => {
-    SafeResponseModule._resetForTesting();
+    // Reset the duplicate-registration counter between tests.
+    // Uses bracket notation to access private static field — acceptable in tests
+    // because _resetForTesting() was removed from the public API surface.
+    SafeResponseModule['instanceCount'] = 0;
   });
 
   describe('register()', () => {
@@ -170,12 +173,17 @@ describe('SafeResponseModule', () => {
       warnSpy.mockRestore();
     });
 
-    it('_resetForTesting() → 카운터 초기화', () => {
-      // instanceCount를 직접 확인하는 대신 기능적으로 검증
-      SafeResponseModule._resetForTesting();
-      // Reset 후 register() 호출이 정상 동작함
-      const result = SafeResponseModule.register();
-      expect((result.providers as any[]).length).toBeGreaterThan(0);
+    it('카운터 초기화 후 재등록 → 경고 없음', () => {
+      const warnSpy = jest
+        .spyOn(SafeResponseModule['logger'], 'warn')
+        .mockImplementation();
+
+      // beforeEach에서 instanceCount = 0으로 리셋됨
+      const instance = new SafeResponseModule();
+      instance.onModuleInit(); // count = 1, no warn
+
+      expect(warnSpy).not.toHaveBeenCalled();
+      warnSpy.mockRestore();
     });
   });
 });

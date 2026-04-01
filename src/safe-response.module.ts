@@ -70,9 +70,4 @@ export class SafeResponseModule implements OnModuleInit {
       ],
     };
   }
-
-  /** @internal Reset instance count (for testing only) */
-  static _resetForTesting(): void {
-    SafeResponseModule.instanceCount = 0;
-  }
 }
