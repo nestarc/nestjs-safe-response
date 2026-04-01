@@ -547,7 +547,7 @@ This library is built with multiple layers of verification to ensure production 
 
 | Category | Count | What it covers |
 |----------|-------|----------------|
-| Unit tests | 333 | Interceptor, Exception Filter, Module DI, Decorators, Client Type Guards, i18n Adapter, Global Errors, Shared Utilities |
+| Unit tests | 336 | Interceptor, Exception Filter, Module DI, Decorators, Client Type Guards, i18n Adapter, Global Errors, Shared Utilities |
 | E2E tests (Express) | 44 | Full HTTP request/response cycle including all v0.10.0 features |
 | E2E tests (Fastify) | 44 | Full platform parity with Express — all features verified on Fastify |
 | E2E tests (Swagger) | 40 | OpenAPI schema output verification including Problem Details and Global Errors |

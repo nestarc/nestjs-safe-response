@@ -540,7 +540,7 @@ export class AppModule {}
 
 | 카테고리 | 수량 | 검증 범위 |
 |----------|------|-----------|
-| 단위 테스트 | 333 | Interceptor, Exception Filter, Module DI, Decorators, Client Type Guards, i18n Adapter, Global Errors, Shared Utilities |
+| 단위 테스트 | 336 | Interceptor, Exception Filter, Module DI, Decorators, Client Type Guards, i18n Adapter, Global Errors, Shared Utilities |
 | E2E 테스트 (Express) | 44 | 전체 HTTP 요청/응답 사이클 |
 | E2E 테스트 (Fastify) | 44 | Express와 완전 동일한 기능 검증 — 전체 플랫폼 패리티 |
 | E2E 테스트 (Swagger) | 40 | Problem Details, Global Errors 포함 OpenAPI 스키마 출력 검증 |
