@@ -14,14 +14,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Decorator metadata key constants (`CURSOR_PAGINATED_KEY`, `PROBLEM_TYPE_KEY`, `SORT_META_KEY`, `FILTER_META_KEY`, `SKIP_GLOBAL_ERRORS_KEY`, `DEPRECATED_KEY`) are now marked `@internal` in JSDoc. These will be removed from public exports in v1.0.0 — use the corresponding decorators instead.
 
 ### Added
+- **`SafeAnyResponse<T>` client type** — broader union `SafeSuccessResponse<T> | SafeErrorResponse | SafeProblemDetailsResponse` for consumers using Problem Details mode. The existing `SafeResponse<T>` (success | error only) is unchanged.
 - **Client ↔ Server type sync tests** — bidirectional `expectAssignable` assertions in `index.test-d.ts` verify that client types (`nestjs-safe-response/client`) remain structurally compatible with server types. Catches type drift at build time.
 - 3 new unit tests for Problem Details title translation (translated, default English, adapter exception fallback)
+- 8 new unit tests for `extractRateLimitMeta` shared utility
+- 6 new unit tests for `SortMeta`, `FilterMeta`, `ApiSafeProblemResponse` decorators
 
 ### Fixed
-- **User callback safety** (from pre-release audit) — `errorCodeMapper`, `dateFormatter`, and `successCodeMapper` callbacks are now wrapped in try-catch. A throwing callback no longer crashes the filter/interceptor.
+- **User callback safety** — `errorCodeMapper`, `dateFormatter`, `successCodeMapper`, and `requestId.generator` callbacks are now all wrapped in try-catch. A throwing callback no longer crashes the filter/interceptor.
 - **Rate limit code duplication** — `extractRateLimitMeta()` extracted to `shared/response-helpers.ts`, eliminating ~35 lines of identical code between the interceptor and filter.
 - **Missing error codes** — added `405 METHOD_NOT_ALLOWED`, `502 BAD_GATEWAY`, `503 SERVICE_UNAVAILABLE` to `DEFAULT_ERROR_CODE_MAP`.
 - **Error log correlation** — 5xx error log messages now include `[requestId]` (or `[-]` when disabled) for production debugging.
+- **Problem Details meta type** — `SafeProblemDetailsResponse.meta` now includes `rateLimit` field in both server and client interfaces, matching runtime behavior.
+- **Global errors fallback schema** — `applyGlobalErrors()` ProblemDetailsDto fallback schema now includes `deprecation` and `rateLimit` in meta, matching the actual DTO class.
 
 ### Infrastructure
 - **ESLint** — added `eslint.config.mjs` (typescript-eslint flat config) and `npm run lint` script. CI now runs lint before build.

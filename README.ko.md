@@ -509,14 +509,15 @@ SafeResponseModule.register({
 `nestjs-safe-response/client`는 NestJS, Swagger, `reflect-metadata` 의존 없이 프론트엔드에서 사용할 수 있는 TypeScript 타입과 타입 가드를 제공합니다.
 
 ```typescript
-import type { SafeResponse, SafeSuccessResponse } from 'nestjs-safe-response/client';
+import type { SafeAnyResponse } from 'nestjs-safe-response/client';
 import {
   isSuccess, isError, isPaginated, isOffsetPagination, isCursorPagination,
   isProblemDetailsResponse, hasResponseTime, hasSort, hasFilters,
   isDeprecated, hasRateLimit,
 } from 'nestjs-safe-response/client';
 
-const res: SafeResponse<User[]> = await fetch('/api/users').then(r => r.json());
+// SafeAnyResponse는 성공, 에러, Problem Details 응답을 모두 포함합니다
+const res: SafeAnyResponse<User[]> = await fetch('/api/users').then(r => r.json());
 
 if (isSuccess(res)) {
   console.log(res.data);  // User[]

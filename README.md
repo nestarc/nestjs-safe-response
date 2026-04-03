@@ -516,14 +516,15 @@ Error response:
 `nestjs-safe-response/client` provides zero-dependency TypeScript types and type guards for frontend consumers. No NestJS, Swagger, or `reflect-metadata` required.
 
 ```typescript
-import type { SafeResponse, SafeSuccessResponse } from 'nestjs-safe-response/client';
+import type { SafeAnyResponse } from 'nestjs-safe-response/client';
 import {
   isSuccess, isError, isPaginated, isOffsetPagination, isCursorPagination,
   isProblemDetailsResponse, hasResponseTime, hasSort, hasFilters,
   isDeprecated, hasRateLimit,
 } from 'nestjs-safe-response/client';
 
-const res: SafeResponse<User[]> = await fetch('/api/users').then(r => r.json());
+// SafeAnyResponse includes success, error, and Problem Details responses
+const res: SafeAnyResponse<User[]> = await fetch('/api/users').then(r => r.json());
 
 if (isSuccess(res)) {
   console.log(res.data);  // User[]
