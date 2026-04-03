@@ -329,7 +329,7 @@ describe('SafeExceptionFilter', () => {
       filter.catch(error, host);
 
       expect(loggerErrorSpy).toHaveBeenCalledWith(
-        'POST /api/crash 500',
+        'POST /api/crash 500 [-]',
         error.stack,
       );
     });
@@ -342,7 +342,7 @@ describe('SafeExceptionFilter', () => {
       filter.catch('string error', host);
 
       expect(loggerErrorSpy).toHaveBeenCalledWith(
-        'GET /test 500',
+        'GET /test 500 [-]',
         undefined,
       );
     });

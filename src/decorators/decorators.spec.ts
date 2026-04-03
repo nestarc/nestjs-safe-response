@@ -4,11 +4,14 @@ import {
   ApiPaginatedSafeResponse,
   ApiCursorPaginatedSafeResponse,
   ApiSafeErrorResponse,
+  ApiSafeProblemResponse,
   RawResponse,
   Paginated,
   CursorPaginated,
   ResponseMessage,
   SuccessCode,
+  SortMeta,
+  FilterMeta,
   Deprecated,
 } from './index';
 import { ApiProperty } from '@nestjs/swagger';
@@ -19,6 +22,8 @@ import {
   RESPONSE_MESSAGE_KEY,
   SUCCESS_CODE_KEY,
   DEPRECATED_KEY,
+  SORT_META_KEY,
+  FILTER_META_KEY,
 } from '../constants';
 
 const RESPONSE_METADATA_KEY = 'swagger/apiResponse';
@@ -409,5 +414,75 @@ describe('Deprecated', () => {
     );
     expect(operationMeta).toBeDefined();
     expect(operationMeta.deprecated).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// SortMeta
+// ---------------------------------------------------------------------------
+describe('SortMeta', () => {
+  it('SORT_META_KEY 메타데이터를 true로 설정', () => {
+    class TestController {
+      @SortMeta()
+      findAll() {}
+    }
+
+    const value = Reflect.getMetadata(SORT_META_KEY, TestController.prototype.findAll);
+    expect(value).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// FilterMeta
+// ---------------------------------------------------------------------------
+describe('FilterMeta', () => {
+  it('FILTER_META_KEY 메타데이터를 true로 설정', () => {
+    class TestController {
+      @FilterMeta()
+      findAll() {}
+    }
+
+    const value = Reflect.getMetadata(FILTER_META_KEY, TestController.prototype.findAll);
+    expect(value).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// ApiSafeProblemResponse
+// ---------------------------------------------------------------------------
+describe('ApiSafeProblemResponse', () => {
+  it('Problem Details 스키마로 에러 응답 메타데이터 설정', () => {
+    class TestController {
+      @ApiSafeProblemResponse(404)
+      find() {}
+    }
+
+    const meta = getResponseMetadata(TestController.prototype, 'find');
+    expect(meta[404]).toBeDefined();
+    expect(meta[404].description).toBe('Problem Details (404)');
+    expect(meta[404].content).toBeDefined();
+    expect(meta[404].content['application/problem+json']).toBeDefined();
+    expect(meta[404].content['application/problem+json'].schema.$ref).toContain('ProblemDetailsDto');
+  });
+
+  it('커스텀 description 지원', () => {
+    class TestController {
+      @ApiSafeProblemResponse(400, { description: 'Validation error' })
+      validate() {}
+    }
+
+    const meta = getResponseMetadata(TestController.prototype, 'validate');
+    expect(meta[400].description).toBe('Validation error');
+  });
+
+  it('ProblemDetailsDto를 extra model로 등록', () => {
+    class TestController {
+      @ApiSafeProblemResponse(500)
+      error() {}
+    }
+
+    const models = getExtraModels(TestController.prototype, 'error');
+    const modelNames = models.map((m: any) => m.name);
+    expect(modelNames).toContain('ProblemDetailsDto');
   });
 });

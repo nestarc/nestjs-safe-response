@@ -48,7 +48,15 @@ jobs:
             @nestjs/testing@^${{ matrix.nestjs-version }} \
             @nestjs/swagger@^${{ matrix.swagger-version }}
 
+      - run: npm run lint
       - run: npm run build
       - run: npm run test:cov
       - run: npm run test:e2e
       - run: npm run test:types
+
+      - name: Upload coverage to Codecov
+        if: matrix.node-version == 22 && !matrix.override
+        uses: codecov/codecov-action@v5
+        with:
+          directory: ./coverage
+          fail_ci_if_error: false

@@ -34,8 +34,6 @@ import {
   CursorPaginationMeta,
   RequestIdOptions,
   DeprecatedOptions,
-  RateLimitOptions,
-  RateLimitMeta,
 } from '../interfaces';
 import {
   REQUEST_WRAPPED,
@@ -52,9 +50,9 @@ import {
   resolveContextMeta,
   sanitizeRequestId,
   setResponseHeader,
-  getResponseHeader,
   buildDeprecationMeta,
   setDeprecationHeaders,
+  extractRateLimitMeta,
 } from '../shared/response-helpers';
 
 @Injectable()
@@ -170,7 +168,11 @@ export class SafeResponseInterceptor implements NestInterceptor {
         // 성공 코드 해석: @SuccessCode() > successCodeMapper > 생략
         let code: string | undefined = successCode;
         if (!code && this.options.successCodeMapper) {
-          code = this.options.successCodeMapper(statusCode);
+          try {
+            code = this.options.successCodeMapper(statusCode);
+          } catch {
+            // Fall back to no code if the custom mapper throws
+          }
         }
 
         const response: SafeSuccessResponse = {
@@ -251,7 +253,7 @@ export class SafeResponseInterceptor implements NestInterceptor {
         }
 
         // Rate limit metadata (mirror response headers set by middleware/guards)
-        const rateLimitMeta = this.extractRateLimitMeta(responseObj);
+        const rateLimitMeta = extractRateLimitMeta(responseObj, this.options.rateLimit);
         if (rateLimitMeta) {
           response.meta = { ...response.meta, rateLimit: rateLimitMeta };
         }
@@ -260,9 +262,15 @@ export class SafeResponseInterceptor implements NestInterceptor {
         const includePath = this.options.path ?? true;
 
         if (includeTimestamp) {
-          response.timestamp = this.options.dateFormatter
-            ? this.options.dateFormatter()
-            : new Date().toISOString();
+          let timestamp: string;
+          try {
+            timestamp = this.options.dateFormatter
+              ? this.options.dateFormatter()
+              : new Date().toISOString();
+          } catch {
+            timestamp = new Date().toISOString();
+          }
+          response.timestamp = timestamp;
         }
 
         if (includePath) {
@@ -449,45 +457,4 @@ export class SafeResponseInterceptor implements NestInterceptor {
     };
   }
 
-  /**
-   * Extract rate limit metadata from response headers set by middleware/guards.
-   * All three core headers (Limit, Remaining, Reset) must be present and numeric;
-   * partial data is suppressed to avoid confusing consumers.
-   */
-  private extractRateLimitMeta(
-    response: SafeHttpResponse,
-  ): RateLimitMeta | undefined {
-    const opts = this.options.rateLimit;
-    if (!opts) return undefined;
-
-    const config: RateLimitOptions = typeof opts === 'object' ? opts : {};
-    const prefix = config.headerPrefix ?? 'X-RateLimit';
-
-    const limitStr = getResponseHeader(response, `${prefix}-Limit`);
-    const remainingStr = getResponseHeader(response, `${prefix}-Remaining`);
-    const resetStr = getResponseHeader(response, `${prefix}-Reset`);
-
-    if (!limitStr || !remainingStr || !resetStr) return undefined;
-
-    const limit = Number(limitStr);
-    const remaining = Number(remainingStr);
-    const reset = Number(resetStr);
-
-    if (Number.isNaN(limit) || Number.isNaN(remaining) || Number.isNaN(reset)) {
-      return undefined;
-    }
-
-    const meta: RateLimitMeta = { limit, remaining, reset };
-
-    // Retry-After is optional (only present when rate limited)
-    const retryAfterStr = getResponseHeader(response, 'Retry-After');
-    if (retryAfterStr) {
-      const retryAfter = Number(retryAfterStr);
-      if (!Number.isNaN(retryAfter)) {
-        meta.retryAfter = retryAfter;
-      }
-    }
-
-    return meta;
-  }
 }

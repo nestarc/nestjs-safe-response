@@ -20,4 +20,5 @@ export {
   getResponseHeader,
   buildDeprecationMeta,
   setDeprecationHeaders,
+  extractRateLimitMeta,
 } from './response-helpers';

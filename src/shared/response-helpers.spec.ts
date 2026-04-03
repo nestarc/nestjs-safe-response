@@ -7,6 +7,7 @@ import {
   getResponseHeader,
   buildDeprecationMeta,
   setDeprecationHeaders,
+  extractRateLimitMeta,
   SafeHttpResponse,
 } from './response-helpers';
 import { I18nAdapter } from '../adapters/i18n.adapter';
@@ -361,5 +362,107 @@ describe('setDeprecationHeaders', () => {
       'Sunset',
       expect.anything(),
     );
+  });
+});
+
+describe('extractRateLimitMeta', () => {
+  function mockResponse(headers: Record<string, string>): SafeHttpResponse {
+    return {
+      getHeader: jest.fn((name: string) => headers[name]),
+    };
+  }
+
+  it('opts가 undefined → undefined', () => {
+    const res = mockResponse({});
+    expect(extractRateLimitMeta(res, undefined)).toBeUndefined();
+  });
+
+  it('opts가 false → undefined', () => {
+    const res = mockResponse({});
+    expect(extractRateLimitMeta(res, false)).toBeUndefined();
+  });
+
+  it('기본 헤더 프리픽스: 세 헤더 모두 존재 → RateLimitMeta 반환', () => {
+    const res = mockResponse({
+      'X-RateLimit-Limit': '100',
+      'X-RateLimit-Remaining': '42',
+      'X-RateLimit-Reset': '1700000000',
+    });
+    expect(extractRateLimitMeta(res, true)).toEqual({
+      limit: 100,
+      remaining: 42,
+      reset: 1700000000,
+    });
+  });
+
+  it('커스텀 headerPrefix 사용', () => {
+    const res = mockResponse({
+      'RateLimit-Limit': '50',
+      'RateLimit-Remaining': '10',
+      'RateLimit-Reset': '1700001000',
+    });
+    expect(extractRateLimitMeta(res, { headerPrefix: 'RateLimit' })).toEqual({
+      limit: 50,
+      remaining: 10,
+      reset: 1700001000,
+    });
+  });
+
+  it('일부 헤더 누락 → undefined', () => {
+    const res = mockResponse({
+      'X-RateLimit-Limit': '100',
+      'X-RateLimit-Remaining': '42',
+    });
+    expect(extractRateLimitMeta(res, true)).toBeUndefined();
+  });
+
+  it('NaN 값 → undefined', () => {
+    const res = mockResponse({
+      'X-RateLimit-Limit': 'abc',
+      'X-RateLimit-Remaining': '42',
+      'X-RateLimit-Reset': '1700000000',
+    });
+    expect(extractRateLimitMeta(res, true)).toBeUndefined();
+  });
+
+  it('Retry-After 포함', () => {
+    const res = mockResponse({
+      'X-RateLimit-Limit': '100',
+      'X-RateLimit-Remaining': '0',
+      'X-RateLimit-Reset': '1700000000',
+      'Retry-After': '30',
+    });
+    const meta = extractRateLimitMeta(res, true);
+    expect(meta).toEqual({
+      limit: 100,
+      remaining: 0,
+      reset: 1700000000,
+      retryAfter: 30,
+    });
+  });
+
+  it('Retry-After가 NaN → retryAfter 생략', () => {
+    const res = mockResponse({
+      'X-RateLimit-Limit': '100',
+      'X-RateLimit-Remaining': '0',
+      'X-RateLimit-Reset': '1700000000',
+      'Retry-After': 'invalid',
+    });
+    const meta = extractRateLimitMeta(res, true);
+    expect(meta).toBeDefined();
+    expect(meta!.retryAfter).toBeUndefined();
+  });
+
+  it('opts가 빈 객체 → 기본 프리픽스 사용', () => {
+    const res = mockResponse({
+      'X-RateLimit-Limit': '200',
+      'X-RateLimit-Remaining': '199',
+      'X-RateLimit-Reset': '1700002000',
+    });
+    expect(extractRateLimitMeta(res, {})).toEqual({
+      limit: 200,
+      remaining: 199,
+      reset: 1700002000,
+    });
   });
 });

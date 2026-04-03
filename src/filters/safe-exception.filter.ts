@@ -17,8 +17,6 @@ import {
   ProblemDetailsOptions,
   RequestIdOptions,
   DeprecatedOptions,
-  RateLimitOptions,
-  RateLimitMeta,
 } from '../interfaces';
 import { I18nAdapter } from '../adapters/i18n.adapter';
 import {
@@ -36,9 +34,9 @@ import {
   resolveContextMeta,
   sanitizeRequestId,
   setResponseHeader,
-  getResponseHeader,
   buildDeprecationMeta,
   setDeprecationHeaders,
+  extractRateLimitMeta,
 } from '../shared/response-helpers';
 
 @Catch()
@@ -114,10 +112,14 @@ export class SafeExceptionFilter implements ExceptionFilter {
       }
     }
 
-    // Custom error code mapping
+    // Custom error code mapping (guarded: user-provided mapper must not crash the filter)
     let errorCode: string | undefined;
     if (this.options.errorCodeMapper) {
-      errorCode = this.options.errorCodeMapper(exception);
+      try {
+        errorCode = this.options.errorCodeMapper(exception);
+      } catch {
+        // Fall back to default code map if the custom mapper throws
+      }
     }
 
     if (!errorCode) {
@@ -139,7 +141,7 @@ export class SafeExceptionFilter implements ExceptionFilter {
 
     if (statusCode >= 500) {
       this.logger.error(
-        `${requestMethod} ${requestUrl} ${statusCode}`,
+        `${requestMethod} ${requestUrl} ${statusCode} [${requestId ?? '-'}]`,
         exception instanceof Error ? exception.stack : undefined,
       );
     }
@@ -180,7 +182,7 @@ export class SafeExceptionFilter implements ExceptionFilter {
       const deprecationMeta = deprecatedOptions
         ? { deprecation: buildDeprecationMeta(deprecatedOptions) }
         : {};
-      const rateLimitMeta = this.extractRateLimitMeta(response);
+      const rateLimitMeta = extractRateLimitMeta(response, this.options.rateLimit);
       const rateLimitObj = rateLimitMeta ? { rateLimit: rateLimitMeta } : {};
       const meta = { ...responseTimeMeta, ...contextMeta, ...deprecationMeta, ...rateLimitObj };
 
@@ -218,7 +220,7 @@ export class SafeExceptionFilter implements ExceptionFilter {
     const deprecationMetaObj = deprecatedOptions
       ? { deprecation: buildDeprecationMeta(deprecatedOptions) }
       : {};
-    const rateLimitMetaObj = this.extractRateLimitMeta(response);
+    const rateLimitMetaObj = extractRateLimitMeta(response, this.options.rateLimit);
     const rateLimitObj = rateLimitMetaObj ? { rateLimit: rateLimitMetaObj } : {};
     const errorMeta = { ...responseTimeMeta, ...contextMeta, ...deprecationMetaObj, ...rateLimitObj };
     if (Object.keys(errorMeta).length > 0) {
@@ -229,9 +231,15 @@ export class SafeExceptionFilter implements ExceptionFilter {
     const includePath = this.options.path ?? true;
 
     if (includeTimestamp) {
-      body.timestamp = this.options.dateFormatter
-        ? this.options.dateFormatter()
-        : new Date().toISOString();
+      let timestamp: string;
+      try {
+        timestamp = this.options.dateFormatter
+          ? this.options.dateFormatter()
+          : new Date().toISOString();
+      } catch {
+        timestamp = new Date().toISOString();
+      }
+      body.timestamp = timestamp;
     }
 
     if (includePath) {
@@ -267,43 +275,4 @@ export class SafeExceptionFilter implements ExceptionFilter {
     return id;
   }
 
-  /**
-   * Extract rate limit metadata from response headers.
-   * Particularly useful for 429 responses where the Guard already set rate limit headers.
-   */
-  private extractRateLimitMeta(
-    response: SafeHttpResponse,
-  ): RateLimitMeta | undefined {
-    const opts = this.options.rateLimit;
-    if (!opts) return undefined;
-
-    const config: RateLimitOptions = typeof opts === 'object' ? opts : {};
-    const prefix = config.headerPrefix ?? 'X-RateLimit';
-
-    const limitStr = getResponseHeader(response, `${prefix}-Limit`);
-    const remainingStr = getResponseHeader(response, `${prefix}-Remaining`);
-    const resetStr = getResponseHeader(response, `${prefix}-Reset`);
-
-    if (!limitStr || !remainingStr || !resetStr) return undefined;
-
-    const limit = Number(limitStr);
-    const remaining = Number(remainingStr);
-    const reset = Number(resetStr);
-
-    if (Number.isNaN(limit) || Number.isNaN(remaining) || Number.isNaN(reset)) {
-      return undefined;
-    }
-
-    const meta: RateLimitMeta = { limit, remaining, reset };
-
-    const retryAfterStr = getResponseHeader(response, 'Retry-After');
-    if (retryAfterStr) {
-      const retryAfter = Number(retryAfterStr);
-      if (!Number.isNaN(retryAfter)) {
-        meta.retryAfter = retryAfter;
-      }
-    }
-
-    return meta;
-  }
 }

@@ -8,7 +8,7 @@
 
 import { ModuleRef } from '@nestjs/core';
 import { I18nAdapter, NestI18nAdapter } from '../adapters/i18n.adapter';
-import { ContextOptions, DeprecatedOptions, DeprecationMeta } from '../interfaces';
+import { ContextOptions, DeprecatedOptions, DeprecationMeta, RateLimitOptions, RateLimitMeta } from '../interfaces';
 
 // ─── Platform-neutral HTTP interfaces ──────────────────────────────
 
@@ -266,4 +266,47 @@ export function setDeprecationHeaders(
       setResponseHeader(response, 'Link', newLink);
     }
   }
+}
+
+// ─── Rate limit helpers ─────────────────────────────────────────
+
+/**
+ * Extract rate limit metadata from response headers set by middleware/guards.
+ * All three core headers (Limit, Remaining, Reset) must be present and numeric;
+ * partial data is suppressed to avoid confusing consumers.
+ */
+export function extractRateLimitMeta(
+  response: SafeHttpResponse,
+  opts: boolean | RateLimitOptions | undefined,
+): RateLimitMeta | undefined {
+  if (!opts) return undefined;
+
+  const config: RateLimitOptions = typeof opts === 'object' ? opts : {};
+  const prefix = config.headerPrefix ?? 'X-RateLimit';
+
+  const limitStr = getResponseHeader(response, `${prefix}-Limit`);
+  const remainingStr = getResponseHeader(response, `${prefix}-Remaining`);
+  const resetStr = getResponseHeader(response, `${prefix}-Reset`);
+
+  if (!limitStr || !remainingStr || !resetStr) return undefined;
+
+  const limit = Number(limitStr);
+  const remaining = Number(remainingStr);
+  const reset = Number(resetStr);
+
+  if (Number.isNaN(limit) || Number.isNaN(remaining) || Number.isNaN(reset)) {
+    return undefined;
+  }
+
+  const meta: RateLimitMeta = { limit, remaining, reset };
+
+  const retryAfterStr = getResponseHeader(response, 'Retry-After');
+  if (retryAfterStr) {
+    const retryAfter = Number(retryAfterStr);
+    if (!Number.isNaN(retryAfter)) {
+      meta.retryAfter = retryAfter;
+    }
+  }
+
+  return meta;
 }
