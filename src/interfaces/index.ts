@@ -47,6 +47,13 @@ export interface RateLimitMeta {
   retryAfter?: number;
 }
 
+export interface ErrorCodeMapperContext {
+  /** Resolved HTTP status code */
+  statusCode: number;
+  /** Default code from errorCodes option or DEFAULT_ERROR_CODE_MAP */
+  defaultCode: string;
+}
+
 export interface SwaggerOptions {
   /** Error responses to add to all routes (e.g., [401, 403, 500]) */
   globalErrors?: ApiSafeErrorResponseConfig[];
@@ -57,8 +64,8 @@ export interface SafeResponseModuleOptions {
   timestamp?: boolean;
   /** Include path field in responses (default: true) */
   path?: boolean;
-  /** Custom error code mapper function */
-  errorCodeMapper?: (exception: unknown) => string | undefined;
+  /** Custom error code mapper function. Optional second arg provides statusCode and defaultCode context. */
+  errorCodeMapper?: (exception: unknown, context?: ErrorCodeMapperContext) => string | undefined;
   /** Custom date formatter function (default: ISO 8601) */
   dateFormatter?: () => string;
   /** Custom success code mapper function (statusCode → code string) */
@@ -79,6 +86,10 @@ export interface SafeResponseModuleOptions {
   i18n?: boolean | import('../adapters/i18n.adapter').I18nAdapter;
   /** Mirror rate limit response headers into meta.rateLimit. true uses defaults, or pass options object. */
   rateLimit?: boolean | RateLimitOptions;
+  /** Suppress shape-mismatch warnings for @Paginated, @CursorPaginated, @SortMeta, @FilterMeta. Default: false */
+  suppressWarnings?: boolean;
+  /** Declarative error code map. Merged on top of DEFAULT_ERROR_CODE_MAP. Use for simple status-to-code mappings. */
+  errorCodes?: Record<number, string>;
 }
 
 export interface ProblemDetailsOptions {
@@ -235,3 +246,66 @@ export interface ApiSafeErrorResponseOptions {
 export type ApiSafeErrorResponseConfig =
   | number
   | ({ status: number } & ApiSafeErrorResponseOptions);
+
+export interface SafeEndpointOptions {
+  /** HTTP status code for Swagger response (default: 200) */
+  statusCode?: number;
+  /** Whether data is an array (default: false) */
+  isArray?: boolean;
+  /** Swagger response description */
+  description?: string;
+  /** Include sort metadata from handler return value (default: false) */
+  sort?: boolean;
+  /** Include filter metadata from handler return value (default: false) */
+  filter?: boolean;
+  /** Custom response message in meta */
+  message?: string;
+  /** Custom success code */
+  code?: string;
+  /** Error responses to document in Swagger */
+  errors?: ApiSafeErrorResponseConfig[];
+  /** Mark endpoint as deprecated with RFC headers */
+  deprecated?: DeprecatedOptions;
+}
+
+export interface SafePaginatedEndpointOptions {
+  /** Maximum items per page (clamped via PaginatedOptions.maxLimit) */
+  maxLimit?: number;
+  /** Generate HATEOAS navigation links (default: false) */
+  links?: boolean;
+  /** Include sort metadata from handler return value (default: false) */
+  sort?: boolean;
+  /** Include filter metadata from handler return value (default: false) */
+  filter?: boolean;
+  /** Swagger response description */
+  description?: string;
+  /** Custom response message in meta */
+  message?: string;
+  /** Custom success code */
+  code?: string;
+  /** Error responses to document in Swagger */
+  errors?: ApiSafeErrorResponseConfig[];
+  /** Mark endpoint as deprecated with RFC headers */
+  deprecated?: DeprecatedOptions;
+}
+
+export interface SafeCursorPaginatedEndpointOptions {
+  /** Maximum items per page */
+  maxLimit?: number;
+  /** Generate HATEOAS navigation links (default: false) */
+  links?: boolean;
+  /** Include sort metadata (default: false) */
+  sort?: boolean;
+  /** Include filter metadata (default: false) */
+  filter?: boolean;
+  /** Swagger response description */
+  description?: string;
+  /** Custom response message in meta */
+  message?: string;
+  /** Custom success code */
+  code?: string;
+  /** Error responses to document in Swagger */
+  errors?: ApiSafeErrorResponseConfig[];
+  /** Mark endpoint as deprecated with RFC headers */
+  deprecated?: DeprecatedOptions;
+}
