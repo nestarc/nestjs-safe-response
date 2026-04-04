@@ -13,6 +13,9 @@ import {
   SortMeta,
   FilterMeta,
   Deprecated,
+  SafeEndpoint,
+  SafePaginatedEndpoint,
+  SafeCursorPaginatedEndpoint,
 } from './index';
 import { ApiProperty } from '@nestjs/swagger';
 import {
@@ -484,5 +487,150 @@ describe('ApiSafeProblemResponse', () => {
     const models = getExtraModels(TestController.prototype, 'error');
     const modelNames = models.map((m: any) => m.name);
     expect(modelNames).toContain('ProblemDetailsDto');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// SafeEndpoint (composite)
+// ---------------------------------------------------------------------------
+describe('SafeEndpoint', () => {
+  it('should set Swagger response metadata for the model', () => {
+    class TestController {
+      @SafeEndpoint(UserDto)
+      find() {}
+    }
+    const meta = getResponseMetadata(TestController.prototype, 'find');
+    expect(meta[200]).toBeDefined();
+    const models = getExtraModels(TestController.prototype, 'find');
+    expect(models).toContain(UserDto);
+  });
+
+  it('should apply @ResponseMessage when message option provided', () => {
+    class TestController {
+      @SafeEndpoint(UserDto, { message: 'Users fetched' })
+      find() {}
+    }
+    const message = Reflect.getMetadata(RESPONSE_MESSAGE_KEY, TestController.prototype.find);
+    expect(message).toBe('Users fetched');
+  });
+
+  it('should apply @SuccessCode when code option provided', () => {
+    class TestController {
+      @SafeEndpoint(UserDto, { code: 'FETCH_OK' })
+      find() {}
+    }
+    const code = Reflect.getMetadata(SUCCESS_CODE_KEY, TestController.prototype.find);
+    expect(code).toBe('FETCH_OK');
+  });
+
+  it('should apply @SortMeta when sort: true', () => {
+    class TestController {
+      @SafeEndpoint(UserDto, { sort: true })
+      find() {}
+    }
+    const sortMeta = Reflect.getMetadata(SORT_META_KEY, TestController.prototype.find);
+    expect(sortMeta).toBe(true);
+  });
+
+  it('should apply @FilterMeta when filter: true', () => {
+    class TestController {
+      @SafeEndpoint(UserDto, { filter: true })
+      find() {}
+    }
+    const filterMeta = Reflect.getMetadata(FILTER_META_KEY, TestController.prototype.find);
+    expect(filterMeta).toBe(true);
+  });
+
+  it('should apply @Deprecated when deprecated option provided', () => {
+    class TestController {
+      @SafeEndpoint(UserDto, { deprecated: { sunset: '2026-12-31' } })
+      find() {}
+    }
+    const deprecated = Reflect.getMetadata(DEPRECATED_KEY, TestController.prototype.find);
+    expect(deprecated).toEqual({ sunset: '2026-12-31' });
+  });
+
+  it('should work with no options (minimal call)', () => {
+    class TestController {
+      @SafeEndpoint(UserDto)
+      find() {}
+    }
+    const meta = getResponseMetadata(TestController.prototype, 'find');
+    expect(meta[200]).toBeDefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// SafePaginatedEndpoint (composite)
+// ---------------------------------------------------------------------------
+describe('SafePaginatedEndpoint', () => {
+  it('should set PAGINATED_KEY metadata with options', () => {
+    class TestController {
+      @SafePaginatedEndpoint(UserDto, { maxLimit: 100, links: true })
+      find() {}
+    }
+    const paginated = Reflect.getMetadata(PAGINATED_KEY, TestController.prototype.find);
+    expect(paginated).toEqual({ maxLimit: 100, links: true });
+  });
+
+  it('should set Swagger paginated response metadata', () => {
+    class TestController {
+      @SafePaginatedEndpoint(UserDto)
+      find() {}
+    }
+    const meta = getResponseMetadata(TestController.prototype, 'find');
+    expect(meta[200]).toBeDefined();
+    expect(meta[200].description).toBe('Paginated response');
+  });
+
+  it('should apply @SortMeta and @FilterMeta when options set', () => {
+    class TestController {
+      @SafePaginatedEndpoint(UserDto, { sort: true, filter: true })
+      find() {}
+    }
+    expect(Reflect.getMetadata(SORT_META_KEY, TestController.prototype.find)).toBe(true);
+    expect(Reflect.getMetadata(FILTER_META_KEY, TestController.prototype.find)).toBe(true);
+  });
+
+  it('should work with no options (minimal call)', () => {
+    class TestController {
+      @SafePaginatedEndpoint(UserDto)
+      find() {}
+    }
+    const paginated = Reflect.getMetadata(PAGINATED_KEY, TestController.prototype.find);
+    expect(paginated).toEqual({});
+  });
+});
+
+// ---------------------------------------------------------------------------
+// SafeCursorPaginatedEndpoint (composite)
+// ---------------------------------------------------------------------------
+describe('SafeCursorPaginatedEndpoint', () => {
+  it('should set CURSOR_PAGINATED_KEY metadata with options', () => {
+    class TestController {
+      @SafeCursorPaginatedEndpoint(UserDto, { maxLimit: 50 })
+      find() {}
+    }
+    const cursorPaginated = Reflect.getMetadata(CURSOR_PAGINATED_KEY, TestController.prototype.find);
+    expect(cursorPaginated).toEqual({ maxLimit: 50 });
+  });
+
+  it('should set Swagger cursor-paginated response metadata', () => {
+    class TestController {
+      @SafeCursorPaginatedEndpoint(UserDto)
+      find() {}
+    }
+    const meta = getResponseMetadata(TestController.prototype, 'find');
+    expect(meta[200]).toBeDefined();
+    expect(meta[200].description).toBe('Cursor-paginated response');
+  });
+
+  it('should work with no options (minimal call)', () => {
+    class TestController {
+      @SafeCursorPaginatedEndpoint(UserDto)
+      find() {}
+    }
+    const cursorPaginated = Reflect.getMetadata(CURSOR_PAGINATED_KEY, TestController.prototype.find);
+    expect(cursorPaginated).toEqual({});
   });
 });

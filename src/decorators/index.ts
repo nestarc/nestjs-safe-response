@@ -15,7 +15,7 @@ import {
   CursorPaginationMetaDto,
   ProblemDetailsDto,
 } from '../dto/response.dto';
-import { PaginatedOptions, CursorPaginatedOptions, ApiSafeErrorResponseOptions, ApiSafeErrorResponseConfig, DeprecatedOptions } from '../interfaces';
+import { PaginatedOptions, CursorPaginatedOptions, ApiSafeErrorResponseOptions, ApiSafeErrorResponseConfig, DeprecatedOptions, SafeEndpointOptions, SafePaginatedEndpointOptions, SafeCursorPaginatedEndpointOptions } from '../interfaces';
 
 /**
  * Apply standard safe response wrapping + basic Swagger schema.
@@ -347,4 +347,84 @@ export function ApiSafeProblemResponse(
       },
     }),
   );
+}
+
+/**
+ * Composite decorator for standard (non-paginated) endpoints.
+ * Combines Swagger response, success code, message, error responses, and deprecation.
+ */
+export function SafeEndpoint<T extends Type>(
+  model: T,
+  options: SafeEndpointOptions = {},
+): MethodDecorator {
+  const decorators: MethodDecorator[] = [
+    ApiSafeResponse(model, {
+      isArray: options.isArray,
+      statusCode: options.statusCode,
+      description: options.description,
+    }),
+  ];
+
+  if (options.sort) decorators.push(SortMeta());
+  if (options.filter) decorators.push(FilterMeta());
+  if (options.message) decorators.push(ResponseMessage(options.message));
+  if (options.code) decorators.push(SuccessCode(options.code));
+  if (options.errors?.length) decorators.push(ApiSafeErrorResponses(options.errors));
+  if (options.deprecated) decorators.push(Deprecated(options.deprecated));
+
+  return applyDecorators(...decorators);
+}
+
+/**
+ * Composite decorator for offset-paginated endpoints.
+ * Combines Swagger paginated response, @Paginated(), sort/filter meta, and more.
+ */
+export function SafePaginatedEndpoint<T extends Type>(
+  model: T,
+  options: SafePaginatedEndpointOptions = {},
+): MethodDecorator {
+  const paginatedOpts: PaginatedOptions = {};
+  if (options.maxLimit !== undefined) paginatedOpts.maxLimit = options.maxLimit;
+  if (options.links !== undefined) paginatedOpts.links = options.links;
+
+  const decorators: MethodDecorator[] = [
+    ApiPaginatedSafeResponse(model, { description: options.description }),
+    Paginated(paginatedOpts),
+  ];
+
+  if (options.sort) decorators.push(SortMeta());
+  if (options.filter) decorators.push(FilterMeta());
+  if (options.message) decorators.push(ResponseMessage(options.message));
+  if (options.code) decorators.push(SuccessCode(options.code));
+  if (options.errors?.length) decorators.push(ApiSafeErrorResponses(options.errors));
+  if (options.deprecated) decorators.push(Deprecated(options.deprecated));
+
+  return applyDecorators(...decorators);
+}
+
+/**
+ * Composite decorator for cursor-paginated endpoints.
+ * Combines Swagger cursor-paginated response, @CursorPaginated(), sort/filter meta, and more.
+ */
+export function SafeCursorPaginatedEndpoint<T extends Type>(
+  model: T,
+  options: SafeCursorPaginatedEndpointOptions = {},
+): MethodDecorator {
+  const cursorOpts: CursorPaginatedOptions = {};
+  if (options.maxLimit !== undefined) cursorOpts.maxLimit = options.maxLimit;
+  if (options.links !== undefined) cursorOpts.links = options.links;
+
+  const decorators: MethodDecorator[] = [
+    ApiCursorPaginatedSafeResponse(model, { description: options.description }),
+    CursorPaginated(cursorOpts),
+  ];
+
+  if (options.sort) decorators.push(SortMeta());
+  if (options.filter) decorators.push(FilterMeta());
+  if (options.message) decorators.push(ResponseMessage(options.message));
+  if (options.code) decorators.push(SuccessCode(options.code));
+  if (options.errors?.length) decorators.push(ApiSafeErrorResponses(options.errors));
+  if (options.deprecated) decorators.push(Deprecated(options.deprecated));
+
+  return applyDecorators(...decorators);
 }
