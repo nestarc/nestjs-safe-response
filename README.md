@@ -29,6 +29,9 @@ Standardized API response wrapper for NestJS — auto-wraps success/error respon
 - **nestjs-cls integration** — inject CLS store values (traceId, correlationId) into response `meta`
 - **class-validator support** — validation errors parsed into `details` array with "Validation failed" message
 - **Custom error codes** — map exceptions to machine-readable codes via `errorCodeMapper`
+- **Composite decorators** — `@SafeEndpoint()`, `@SafePaginatedEndpoint()`, `@SafeCursorPaginatedEndpoint()` combine Swagger + runtime + error docs in a single decorator
+- **Declarative error codes** — `errorCodes` option for simple status-to-code mapping without writing a mapper function
+- **Shape-mismatch warnings** — `@Paginated()`, `@CursorPaginated()`, `@SortMeta()`, `@FilterMeta()` warn when handler data doesn't match expected shape
 - **Opt-out per route** — `@RawResponse()` skips wrapping for health checks, SSE, file downloads
 - **Platform-agnostic** — works with both Express and Fastify adapters out of the box
 - **Context-safe** — automatically skips wrapping for non-HTTP contexts (RPC, WebSocket)
@@ -409,6 +412,59 @@ Options: `since`, `sunset`, `message`, `link`
 
 Excludes a route from `applyGlobalErrors()` global error injection. Useful for routes with custom error schemas.
 
+### Composite Decorators
+
+Combine Swagger documentation, runtime behavior, and error responses into a single decorator.
+
+#### `@SafeEndpoint(Model, options?)`
+
+```typescript
+@Get()
+@SafeEndpoint(UserDto, {
+  description: 'List users',
+  errors: [401, { status: 404, code: 'USER_NOT_FOUND' }],
+  message: 'Users fetched',
+})
+findAll() { ... }
+```
+
+Equivalent to stacking `@ApiSafeResponse()` + `@ResponseMessage()` + `@ApiSafeErrorResponses()`.
+
+Options: `statusCode`, `isArray`, `description`, `sort`, `filter`, `message`, `code`, `errors`, `deprecated`, `problemDetails`
+
+#### `@SafePaginatedEndpoint(Model, options?)`
+
+```typescript
+@Get()
+@SafePaginatedEndpoint(UserDto, {
+  maxLimit: 100,
+  links: true,
+  errors: [401],
+})
+findAll() { ... }
+```
+
+Equivalent to `@ApiPaginatedSafeResponse()` + `@Paginated()` + `@ApiSafeErrorResponses()`.
+
+Options: `maxLimit`, `links`, `sort`, `filter`, `description`, `message`, `code`, `errors`, `deprecated`, `problemDetails`
+
+#### `@SafeCursorPaginatedEndpoint(Model, options?)`
+
+```typescript
+@Get()
+@SafeCursorPaginatedEndpoint(UserDto, {
+  maxLimit: 50,
+  errors: [401],
+})
+findAll() { ... }
+```
+
+Equivalent to `@ApiCursorPaginatedSafeResponse()` + `@CursorPaginated()` + `@ApiSafeErrorResponses()`.
+
+Options: `maxLimit`, `links`, `sort`, `filter`, `description`, `message`, `code`, `errors`, `deprecated`, `problemDetails`
+
+> **`problemDetails` option**: When `true`, error responses use `application/problem+json` schema in Swagger. Must match the module-level `problemDetails` setting — this option only controls Swagger documentation, not runtime behavior.
+
 ## Global Error Swagger Documentation
 
 Inject common error responses (e.g., 401, 403, 500) into all OpenAPI operations at once, instead of decorating every route.
@@ -717,6 +773,8 @@ SafeResponseModule.registerAsync({
 | `context` | `ContextOptions` | `undefined` | Inject CLS store values (traceId, etc.) into response `meta`. Requires `nestjs-cls`. |
 | `rateLimit` | `boolean \| RateLimitOptions` | `undefined` | Mirror rate limit response headers into `meta.rateLimit` |
 | `i18n` | `boolean \| I18nAdapter` | `undefined` | Enable i18n for error/success messages. `true` auto-detects `nestjs-i18n`, or pass a custom adapter. |
+| `errorCodes` | `Record<number, string>` | `undefined` | Declarative error code map merged on top of `DEFAULT_ERROR_CODE_MAP` |
+| `suppressWarnings` | `boolean` | `false` | Suppress shape-mismatch warnings for `@Paginated`, `@CursorPaginated`, `@SortMeta`, `@FilterMeta` |
 
 #### Success Code Mapping
 
@@ -776,6 +834,40 @@ export class AppModule {}
 | 500 | `INTERNAL_SERVER_ERROR` |
 
 Override with `errorCodeMapper` option.
+
+### Declarative Error Codes
+
+For simple status-to-code mappings without a mapper function:
+
+```typescript
+SafeResponseModule.register({
+  errorCodes: {
+    404: 'RESOURCE_NOT_FOUND',
+    409: 'DUPLICATE_ENTRY',
+  },
+})
+```
+
+Resolution order: `errorCodeMapper` > `errorCodes` > `DEFAULT_ERROR_CODE_MAP` > `'INTERNAL_SERVER_ERROR'`
+
+### Utility Functions
+
+```typescript
+import { lookupErrorCode, lookupProblemTitle } from 'nestjs-safe-response';
+
+lookupErrorCode(404);      // 'NOT_FOUND'
+lookupProblemTitle(404);   // 'Not Found'
+```
+
+### Shape-mismatch Warnings
+
+When `@Paginated()`, `@CursorPaginated()`, `@SortMeta()`, or `@FilterMeta()` are applied but the handler returns data that doesn't match the expected shape, a `Logger.warn()` is emitted with the route and expected shape.
+
+```typescript
+SafeResponseModule.register({
+  suppressWarnings: true,  // silence shape-mismatch warnings
+})
+```
 
 ## Testing & Reliability
 

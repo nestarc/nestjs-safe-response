@@ -17,7 +17,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - **Const assertions** — `DEFAULT_ERROR_CODE_MAP` and `DEFAULT_PROBLEM_TITLE_MAP` now use `as const` for literal string value types (e.g., `typeof DEFAULT_ERROR_CODE_MAP[400]` is `'BAD_REQUEST'` instead of `string`). Runtime behavior unchanged.
-- **Map lookup helpers** — `lookupErrorCode()` and `lookupProblemTitle()` exported from constants module, consolidating type-widening casts into reusable functions.
+- **Map lookup helpers** — `lookupErrorCode()` and `lookupProblemTitle()` exported from public API, consolidating type-widening casts into reusable functions.
+- **`ApiSafeProblemResponse` enhanced** — now accepts optional `code`, `message`, `details` for per-error Swagger example overrides via `allOf` composition.
+- **`applyGlobalErrors` respects `errorCodes`** — the `errorCodes` module option is now used when resolving error codes in Swagger documentation, matching the runtime resolution chain.
+- **Composite `problemDetails` option** — when `true`, error responses in composite decorators use `application/problem+json` schema with full config forwarding (code, message, details, description).
+
+### Fixed
+- **Swagger success schema** — `SafeSuccessResponseDto` now includes `data` property; typed schema decorators (`ApiSafeResponse`, `ApiPaginatedSafeResponse`, `ApiCursorPaginatedSafeResponse`) add `required: ['success', 'data']` so codegen treats `data` as non-optional.
+- **requestId generator sanitization** — generator return values are now passed through `sanitizeRequestId()` to prevent `ERR_INVALID_CHAR` from invalid header characters. Falls back to `randomUUID()` if sanitized result is empty.
+- **`lookupErrorCode` / `lookupProblemTitle` export** — both functions are now re-exported from the package entry point as documented.
 
 ## [0.12.0] - 2026-04-03
 

@@ -14,7 +14,9 @@ import {
   SuccessCode,
   ProblemType,
   Deprecated,
+  SafeEndpoint,
   SafePaginatedEndpoint,
+  SafeCursorPaginatedEndpoint,
 } from '../../src/decorators';
 import { ApiProperty } from '@nestjs/swagger';
 import { Exclude } from 'class-transformer';
@@ -222,5 +224,26 @@ export class TestController {
   @Paginated()
   paginatedWrongShape() {
     return { id: 1, name: 'Not paginated' };
+  }
+
+  @Get('composite-basic')
+  @SafeEndpoint(ItemDto, {
+    description: 'Basic composite',
+    errors: [404],
+    message: 'Item fetched',
+  })
+  compositeBasic() {
+    return { id: 42 };
+  }
+
+  @Get('composite-cursor')
+  @SafeCursorPaginatedEndpoint(ItemDto, { maxLimit: 25 })
+  compositeCursor() {
+    return {
+      data: [{ id: 10 }, { id: 11 }],
+      nextCursor: 'cursor-abc',
+      hasMore: true,
+      limit: 10,
+    };
   }
 }

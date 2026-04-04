@@ -734,6 +734,31 @@ describe('SafeResponse E2E', () => {
         hasPrev: false,
       });
     });
+
+    it('GET /test/composite-basic → @SafeEndpoint wraps data + includes meta.message', async () => {
+      const res = await request(app.getHttpServer())
+        .get('/test/composite-basic')
+        .expect(200);
+
+      expect(res.body.success).toBe(true);
+      expect(res.body.data).toEqual({ id: 42 });
+      expect(res.body.meta.message).toBe('Item fetched');
+    });
+
+    it('GET /test/composite-cursor → @SafeCursorPaginatedEndpoint wraps cursor pagination', async () => {
+      const res = await request(app.getHttpServer())
+        .get('/test/composite-cursor')
+        .expect(200);
+
+      expect(res.body.success).toBe(true);
+      expect(res.body.data).toEqual([{ id: 10 }, { id: 11 }]);
+      expect(res.body.meta.pagination).toMatchObject({
+        type: 'cursor',
+        nextCursor: 'cursor-abc',
+        hasMore: true,
+        limit: 10,
+      });
+    });
   });
 
   // ─── Error code resolution chain ───

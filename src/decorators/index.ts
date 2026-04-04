@@ -330,13 +330,34 @@ export const Deprecated = (options?: DeprecatedOptions) =>
 
 /**
  * Document an RFC 9457 Problem Details error response in Swagger.
+ *
+ * When `code`, `message`, or `details` are provided, the schema merges
+ * ProblemDetailsDto with inline example overrides via `allOf`.
  */
 export function ApiSafeProblemResponse(
   status: number,
-  options?: { description?: string },
+  options?: { description?: string; code?: string; message?: string; details?: unknown },
 ): MethodDecorator {
   const description =
     options?.description ?? `Problem Details (${status})`;
+
+  const hasOverrides = options?.code || options?.message || options?.details !== undefined;
+
+  const schema = hasOverrides
+    ? {
+        allOf: [
+          { $ref: getSchemaPath(ProblemDetailsDto) },
+          {
+            properties: {
+              status: { type: 'number' as const, example: status },
+              ...(options?.code && { code: { type: 'string' as const, example: options.code } }),
+              ...(options?.message && { detail: { type: 'string' as const, example: options.message } }),
+              ...(options?.details !== undefined && { details: inferDetailsSchema(options.details) }),
+            },
+          },
+        ],
+      }
+    : { $ref: getSchemaPath(ProblemDetailsDto) };
 
   return applyDecorators(
     ApiExtraModels(ProblemDetailsDto),
@@ -344,9 +365,7 @@ export function ApiSafeProblemResponse(
       status,
       description,
       content: {
-        'application/problem+json': {
-          schema: { $ref: getSchemaPath(ProblemDetailsDto) },
-        },
+        'application/problem+json': { schema },
       },
     }),
   );
@@ -440,7 +459,8 @@ export function SafeCursorPaginatedEndpoint<T extends Type>(
 
 /**
  * Build error response decorators for composite decorators.
- * When problemDetails is true, uses ApiSafeProblemResponse for each status code.
+ * When problemDetails is true, uses ApiSafeProblemResponse for each status code,
+ * forwarding code/message/details from the config for Swagger example overrides.
  */
 function buildErrorDecorators(
   errors: ApiSafeErrorResponseConfig[],
@@ -450,8 +470,14 @@ function buildErrorDecorators(
     return [ApiSafeErrorResponses(errors)];
   }
   return errors.map((config) => {
-    const status = typeof config === 'number' ? config : config.status;
-    const description = typeof config === 'number' ? undefined : config.description;
-    return ApiSafeProblemResponse(status, { description });
+    if (typeof config === 'number') {
+      return ApiSafeProblemResponse(config);
+    }
+    return ApiSafeProblemResponse(config.status, {
+      description: config.description,
+      code: config.code,
+      message: config.message,
+      details: config.details,
+    });
   });
 }

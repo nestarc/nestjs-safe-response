@@ -122,8 +122,10 @@ export interface SafeProblemDetailsResponse {
 export interface SafeResponseModuleAsyncOptions
   extends Pick<ModuleMetadata, 'imports'> {
   useFactory: (
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- mirrors NestJS DynamicModule convention
     ...args: any[]
   ) => Promise<SafeResponseModuleOptions> | SafeResponseModuleOptions;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- mirrors NestJS DynamicModule convention
   inject?: any[];
 }
 
@@ -266,7 +268,11 @@ export interface SafeEndpointOptions {
   errors?: ApiSafeErrorResponseConfig[];
   /** Mark endpoint as deprecated with RFC headers */
   deprecated?: DeprecatedOptions;
-  /** Use RFC 9457 Problem Details schema for error responses in Swagger (default: false) */
+  /**
+   * Use RFC 9457 Problem Details schema for error responses in Swagger (default: false).
+   * **Note:** This only controls Swagger documentation schema. The actual runtime error format
+   * is determined by the module-level `problemDetails` option. Keep both in sync.
+   */
   problemDetails?: boolean;
 }
 
@@ -289,7 +295,11 @@ export interface SafePaginatedEndpointOptions {
   errors?: ApiSafeErrorResponseConfig[];
   /** Mark endpoint as deprecated with RFC headers */
   deprecated?: DeprecatedOptions;
-  /** Use RFC 9457 Problem Details schema for error responses in Swagger (default: false) */
+  /**
+   * Use RFC 9457 Problem Details schema for error responses in Swagger (default: false).
+   * **Note:** This only controls Swagger documentation schema. The actual runtime error format
+   * is determined by the module-level `problemDetails` option. Keep both in sync.
+   */
   problemDetails?: boolean;
 }
 
@@ -312,6 +322,10 @@ export interface SafeCursorPaginatedEndpointOptions {
   errors?: ApiSafeErrorResponseConfig[];
   /** Mark endpoint as deprecated with RFC headers */
   deprecated?: DeprecatedOptions;
-  /** Use RFC 9457 Problem Details schema for error responses in Swagger (default: false) */
+  /**
+   * Use RFC 9457 Problem Details schema for error responses in Swagger (default: false).
+   * **Note:** This only controls Swagger documentation schema. The actual runtime error format
+   * is determined by the module-level `problemDetails` option. Keep both in sync.
+   */
   problemDetails?: boolean;
 }
