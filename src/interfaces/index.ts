@@ -266,6 +266,8 @@ export interface SafeEndpointOptions {
   errors?: ApiSafeErrorResponseConfig[];
   /** Mark endpoint as deprecated with RFC headers */
   deprecated?: DeprecatedOptions;
+  /** Use RFC 9457 Problem Details schema for error responses in Swagger (default: false) */
+  problemDetails?: boolean;
 }
 
 export interface SafePaginatedEndpointOptions {
@@ -287,6 +289,8 @@ export interface SafePaginatedEndpointOptions {
   errors?: ApiSafeErrorResponseConfig[];
   /** Mark endpoint as deprecated with RFC headers */
   deprecated?: DeprecatedOptions;
+  /** Use RFC 9457 Problem Details schema for error responses in Swagger (default: false) */
+  problemDetails?: boolean;
 }
 
 export interface SafeCursorPaginatedEndpointOptions {
@@ -308,4 +312,6 @@ export interface SafeCursorPaginatedEndpointOptions {
   errors?: ApiSafeErrorResponseConfig[];
   /** Mark endpoint as deprecated with RFC headers */
   deprecated?: DeprecatedOptions;
+  /** Use RFC 9457 Problem Details schema for error responses in Swagger (default: false) */
+  problemDetails?: boolean;
 }

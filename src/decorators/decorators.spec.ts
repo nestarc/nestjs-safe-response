@@ -558,6 +558,28 @@ describe('SafeEndpoint', () => {
     const meta = getResponseMetadata(TestController.prototype, 'find');
     expect(meta[200]).toBeDefined();
   });
+
+  it('should use ApiSafeErrorResponses when problemDetails is false/undefined', () => {
+    class TestController {
+      @SafeEndpoint(UserDto, { errors: [400, 404] })
+      find() {}
+    }
+    const meta = getResponseMetadata(TestController.prototype, 'find');
+    // Standard error schema uses allOf with SafeErrorResponseDto
+    expect(meta[400]).toBeDefined();
+    expect(meta[400].schema?.allOf?.[0]?.$ref).toContain('SafeErrorResponseDto');
+  });
+
+  it('should use ApiSafeProblemResponse when problemDetails: true', () => {
+    class TestController {
+      @SafeEndpoint(UserDto, { errors: [400, 404], problemDetails: true })
+      find() {}
+    }
+    const meta = getResponseMetadata(TestController.prototype, 'find');
+    // Problem Details schema uses content with application/problem+json
+    expect(meta[400]).toBeDefined();
+    expect(meta[400].content?.['application/problem+json']).toBeDefined();
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -600,6 +622,16 @@ describe('SafePaginatedEndpoint', () => {
     const paginated = Reflect.getMetadata(PAGINATED_KEY, TestController.prototype.find);
     expect(paginated).toEqual({});
   });
+
+  it('should use ApiSafeProblemResponse when problemDetails: true', () => {
+    class TestController {
+      @SafePaginatedEndpoint(UserDto, { errors: [400], problemDetails: true })
+      find() {}
+    }
+    const meta = getResponseMetadata(TestController.prototype, 'find');
+    expect(meta[400]).toBeDefined();
+    expect(meta[400].content?.['application/problem+json']).toBeDefined();
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -632,5 +664,15 @@ describe('SafeCursorPaginatedEndpoint', () => {
     }
     const cursorPaginated = Reflect.getMetadata(CURSOR_PAGINATED_KEY, TestController.prototype.find);
     expect(cursorPaginated).toEqual({});
+  });
+
+  it('should use ApiSafeProblemResponse when problemDetails: true', () => {
+    class TestController {
+      @SafeCursorPaginatedEndpoint(UserDto, { errors: [401], problemDetails: true })
+      find() {}
+    }
+    const meta = getResponseMetadata(TestController.prototype, 'find');
+    expect(meta[401]).toBeDefined();
+    expect(meta[401].content?.['application/problem+json']).toBeDefined();
   });
 });

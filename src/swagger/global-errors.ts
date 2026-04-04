@@ -75,7 +75,7 @@ export function applyGlobalErrors<T extends object>(
       }
 
       for (const config of globalErrors) {
-        const { status, code, message, description } = normalizeConfig(config);
+        const { status, code, message, description } = normalizeConfig(config, options.errorCodes);
         const statusStr = String(status);
 
         // Route-level responses take priority — don't overwrite
@@ -89,7 +89,10 @@ export function applyGlobalErrors<T extends object>(
   return document;
 }
 
-function normalizeConfig(config: ApiSafeErrorResponseConfig): {
+function normalizeConfig(
+  config: ApiSafeErrorResponseConfig,
+  errorCodes?: Record<number, string>,
+): {
   status: number;
   code: string;
   message: string;
@@ -98,14 +101,14 @@ function normalizeConfig(config: ApiSafeErrorResponseConfig): {
   if (typeof config === 'number') {
     return {
       status: config,
-      code: lookupErrorCode(config) ?? 'INTERNAL_SERVER_ERROR',
+      code: errorCodes?.[config] ?? lookupErrorCode(config) ?? 'INTERNAL_SERVER_ERROR',
       message: 'An error occurred',
       description: `Error response (${config})`,
     };
   }
   return {
     status: config.status,
-    code: config.code ?? lookupErrorCode(config.status) ?? 'INTERNAL_SERVER_ERROR',
+    code: config.code ?? errorCodes?.[config.status] ?? lookupErrorCode(config.status) ?? 'INTERNAL_SERVER_ERROR',
     message: config.message ?? 'An error occurred',
     description: config.description ?? `Error response (${config.status})`,
   };

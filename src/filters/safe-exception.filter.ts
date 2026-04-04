@@ -40,6 +40,25 @@ import {
   extractRateLimitMeta,
 } from '../shared/response-helpers';
 
+/**
+ * Global exception filter that wraps errors in the SafeErrorResponse or
+ * RFC 9457 Problem Details envelope.
+ *
+ * ### Known Limitation — Guard-phase exceptions
+ *
+ * NestJS lifecycle: Middleware → Guards → **Interceptors** → Pipes → Handler.
+ * Metadata set by the interceptor (`@Deprecated()`, `@ProblemType()`, `responseTime`)
+ * is stored on the request object. When a guard throws before the interceptor runs,
+ * these values are unavailable to this filter:
+ *
+ * - `meta.responseTime` — start time was never captured
+ * - `meta.deprecation` / Deprecation headers — `@Deprecated()` options not forwarded
+ * - Problem Details `type` URI — `@ProblemType()` value not forwarded (falls back to
+ *   `config.baseUrl`-derived URI or `about:blank`)
+ *
+ * This is an architectural constraint of NestJS's `ArgumentsHost`, which does not
+ * expose `getHandler()` for reflector-based metadata reads.
+ */
 @Catch()
 export class SafeExceptionFilter implements ExceptionFilter {
   private readonly logger = new Logger(SafeExceptionFilter.name);
@@ -279,8 +298,11 @@ export class SafeExceptionFilter implements ExceptionFilter {
     let id = sanitizeRequestId(request.headers?.[headerName]);
     if (!id) {
       try {
-        id = (config.generator ?? (() => randomUUID()))();
+        id = sanitizeRequestId((config.generator ?? (() => randomUUID()))());
       } catch {
+        // Fall through to fallback
+      }
+      if (!id) {
         id = randomUUID();
       }
     }

@@ -340,8 +340,11 @@ export class SafeResponseInterceptor implements NestInterceptor {
     );
     if (!id) {
       try {
-        id = (config.generator ?? (() => randomUUID()))();
+        id = sanitizeRequestId((config.generator ?? (() => randomUUID()))());
       } catch {
+        // Fall through to fallback
+      }
+      if (!id) {
         id = randomUUID();
       }
     }

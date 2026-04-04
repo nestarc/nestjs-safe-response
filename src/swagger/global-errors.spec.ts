@@ -229,6 +229,52 @@ describe('applyGlobalErrors', () => {
     expect(schema.allOf[0].$ref).toBe('#/components/schemas/SafeErrorResponseDto');
   });
 
+  it('should use errorCodes option over DEFAULT_ERROR_CODE_MAP for number config', () => {
+    const doc = createMinimalDocument();
+    const options: SafeResponseModuleOptions = {
+      errorCodes: { 404: 'RESOURCE_NOT_FOUND' },
+      swagger: { globalErrors: [404] },
+    };
+
+    applyGlobalErrors(doc, options);
+
+    const schema = doc.paths['/api/users'].get.responses['404']
+      .content['application/json'].schema.allOf[1];
+    expect(schema.properties.error.properties.code.example).toBe('RESOURCE_NOT_FOUND');
+  });
+
+  it('should use errorCodes option over DEFAULT_ERROR_CODE_MAP for object config without code', () => {
+    const doc = createMinimalDocument();
+    const options: SafeResponseModuleOptions = {
+      errorCodes: { 404: 'RESOURCE_NOT_FOUND' },
+      swagger: {
+        globalErrors: [{ status: 404, description: 'Not found' }],
+      },
+    };
+
+    applyGlobalErrors(doc, options);
+
+    const schema = doc.paths['/api/users'].get.responses['404']
+      .content['application/json'].schema.allOf[1];
+    expect(schema.properties.error.properties.code.example).toBe('RESOURCE_NOT_FOUND');
+  });
+
+  it('should prefer explicit config.code over errorCodes option', () => {
+    const doc = createMinimalDocument();
+    const options: SafeResponseModuleOptions = {
+      errorCodes: { 404: 'RESOURCE_NOT_FOUND' },
+      swagger: {
+        globalErrors: [{ status: 404, code: 'EXPLICIT_CODE' }],
+      },
+    };
+
+    applyGlobalErrors(doc, options);
+
+    const schema = doc.paths['/api/users'].get.responses['404']
+      .content['application/json'].schema.allOf[1];
+    expect(schema.properties.error.properties.code.example).toBe('EXPLICIT_CODE');
+  });
+
   it('should handle operations without responses field', () => {
     const doc: any = {
       openapi: '3.0.0',

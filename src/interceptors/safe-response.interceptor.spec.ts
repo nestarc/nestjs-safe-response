@@ -830,7 +830,38 @@ describe('SafeResponseInterceptor', () => {
       expect(result.requestId).toBe('custom-id-789');
     });
 
-    it('requestId: true → 응답 헤더에 X-Request-Id 설정', async () => {
+    it('requestId: { generator } → 안전하지 않은 문자 sanitize', async () => {
+      jest.spyOn(reflector, 'get').mockReturnValue(undefined);
+      const interceptor = createInterceptor({
+        requestId: { generator: () => 'bad\r\nid<script>' },
+      });
+      const ctx = createMockExecutionContext();
+
+      const result = await lastValueFrom(
+        interceptor.intercept(ctx, createMockCallHandler({ id: 1 })),
+      );
+
+      expect(result.requestId).toBe('badidscript');
+    });
+
+    it('requestId: { generator } → 빈 문자열 반환 시 UUID fallback', async () => {
+      jest.spyOn(reflector, 'get').mockReturnValue(undefined);
+      const interceptor = createInterceptor({
+        requestId: { generator: () => '<<<>>>' },
+      });
+      const ctx = createMockExecutionContext();
+
+      const result = await lastValueFrom(
+        interceptor.intercept(ctx, createMockCallHandler({ id: 1 })),
+      );
+
+      // sanitize 후 빈 문자열 → UUID fallback
+      expect(result.requestId).toMatch(
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/,
+      );
+    });
+
+    it('requestId: true → 응답 ���더에 X-Request-Id 설정', async () => {
       jest.spyOn(reflector, 'get').mockReturnValue(undefined);
       const interceptor = createInterceptor({ requestId: true });
       const ctx = createMockExecutionContext();

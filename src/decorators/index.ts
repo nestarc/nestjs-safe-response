@@ -62,6 +62,7 @@ export function ApiSafeResponse<T extends Type>(
         allOf: [
           { $ref: getSchemaPath(SafeSuccessResponseDto) },
           {
+            required: ['success', 'data'],
             properties: {
               data: dataSchema,
               success: { type: 'boolean', example: true },
@@ -90,6 +91,7 @@ export function ApiPaginatedSafeResponse<T extends Type>(
         allOf: [
           { $ref: getSchemaPath(SafeSuccessResponseDto) },
           {
+            required: ['success', 'data'],
             properties: {
               data: {
                 type: 'array',
@@ -227,6 +229,7 @@ export function ApiCursorPaginatedSafeResponse<T extends Type>(
         allOf: [
           { $ref: getSchemaPath(SafeSuccessResponseDto) },
           {
+            required: ['success', 'data'],
             properties: {
               data: {
                 type: 'array',
@@ -369,7 +372,9 @@ export function SafeEndpoint<T extends Type>(
   if (options.filter) decorators.push(FilterMeta());
   if (options.message) decorators.push(ResponseMessage(options.message));
   if (options.code) decorators.push(SuccessCode(options.code));
-  if (options.errors?.length) decorators.push(ApiSafeErrorResponses(options.errors));
+  if (options.errors?.length) {
+    decorators.push(...buildErrorDecorators(options.errors, options.problemDetails));
+  }
   if (options.deprecated) decorators.push(Deprecated(options.deprecated));
 
   return applyDecorators(...decorators);
@@ -396,7 +401,9 @@ export function SafePaginatedEndpoint<T extends Type>(
   if (options.filter) decorators.push(FilterMeta());
   if (options.message) decorators.push(ResponseMessage(options.message));
   if (options.code) decorators.push(SuccessCode(options.code));
-  if (options.errors?.length) decorators.push(ApiSafeErrorResponses(options.errors));
+  if (options.errors?.length) {
+    decorators.push(...buildErrorDecorators(options.errors, options.problemDetails));
+  }
   if (options.deprecated) decorators.push(Deprecated(options.deprecated));
 
   return applyDecorators(...decorators);
@@ -423,8 +430,28 @@ export function SafeCursorPaginatedEndpoint<T extends Type>(
   if (options.filter) decorators.push(FilterMeta());
   if (options.message) decorators.push(ResponseMessage(options.message));
   if (options.code) decorators.push(SuccessCode(options.code));
-  if (options.errors?.length) decorators.push(ApiSafeErrorResponses(options.errors));
+  if (options.errors?.length) {
+    decorators.push(...buildErrorDecorators(options.errors, options.problemDetails));
+  }
   if (options.deprecated) decorators.push(Deprecated(options.deprecated));
 
   return applyDecorators(...decorators);
+}
+
+/**
+ * Build error response decorators for composite decorators.
+ * When problemDetails is true, uses ApiSafeProblemResponse for each status code.
+ */
+function buildErrorDecorators(
+  errors: ApiSafeErrorResponseConfig[],
+  problemDetails?: boolean,
+): MethodDecorator[] {
+  if (!problemDetails) {
+    return [ApiSafeErrorResponses(errors)];
+  }
+  return errors.map((config) => {
+    const status = typeof config === 'number' ? config : config.status;
+    const description = typeof config === 'number' ? undefined : config.description;
+    return ApiSafeProblemResponse(status, { description });
+  });
 }

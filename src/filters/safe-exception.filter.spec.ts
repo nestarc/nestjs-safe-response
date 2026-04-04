@@ -618,6 +618,34 @@ describe('SafeExceptionFilter', () => {
       expect(headerFn).toHaveBeenCalledWith('X-Request-Id', expect.any(String));
       expect(replyFn.mock.calls[0][1].requestId).toBeDefined();
     });
+
+    it('requestId: { generator } → 안전하지 않은 문자 sanitize', () => {
+      const { adapterHost, replyFn } = createMockHttpAdapterHost();
+      const filter = createFilter(adapterHost, {
+        requestId: { generator: () => 'bad\r\nid<script>' },
+      });
+      const { host } = createMockArgumentsHostWithRequestId({});
+
+      filter.catch(new BadRequestException(), host);
+
+      const body = replyFn.mock.calls[0][1];
+      expect(body.requestId).toBe('badidscript');
+    });
+
+    it('requestId: { generator } → sanitize 후 빈 문자열 시 UUID fallback', () => {
+      const { adapterHost, replyFn } = createMockHttpAdapterHost();
+      const filter = createFilter(adapterHost, {
+        requestId: { generator: () => '<<<>>>' },
+      });
+      const { host } = createMockArgumentsHostWithRequestId({});
+
+      filter.catch(new BadRequestException(), host);
+
+      const body = replyFn.mock.calls[0][1];
+      expect(body.requestId).toMatch(
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/,
+      );
+    });
   });
 
   // ─── 응답 시간 ───
