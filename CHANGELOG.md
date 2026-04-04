@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.13.0] - 2026-04-04
+
+### Added
+- **Composite decorators** — `@SafeEndpoint(Dto, opts?)`, `@SafePaginatedEndpoint(Dto, opts?)`, `@SafeCursorPaginatedEndpoint(Dto, opts?)` combine Swagger documentation + runtime behavior + error responses into a single decorator. Reduces typical decorator stacking from 4-5 to 1. Existing individual decorators remain fully supported.
+- **Shape-mismatch warnings** — `@Paginated()`, `@CursorPaginated()`, `@SortMeta()`, and `@FilterMeta()` now emit `Logger.warn()` when the handler returns data that doesn't match the expected shape. Includes the request route and expected shape in the message. Suppressible via `suppressWarnings: true` module option.
+- **`errorCodes` module option** — declarative `Record<number, string>` to extend or override `DEFAULT_ERROR_CODE_MAP` without writing a mapper function. Resolution order: `errorCodeMapper` > `errorCodes` > `DEFAULT_ERROR_CODE_MAP` > `'INTERNAL_SERVER_ERROR'`.
+- **`ErrorCodeMapperContext`** — `errorCodeMapper` now receives an optional second argument `{ statusCode, defaultCode }` for easier mapping without `instanceof` checks. Existing 1-arg mappers continue to work.
+- `SafeEndpointOptions`, `SafePaginatedEndpointOptions`, `SafeCursorPaginatedEndpointOptions` type exports
+- `suppressWarnings` option on `SafeResponseModuleOptions`
+
+### Changed
+- **Const assertions** — `DEFAULT_ERROR_CODE_MAP` and `DEFAULT_PROBLEM_TITLE_MAP` now use `as const` for literal string value types (e.g., `typeof DEFAULT_ERROR_CODE_MAP[400]` is `'BAD_REQUEST'` instead of `string`). Runtime behavior unchanged.
+- **Map lookup helpers** — `lookupErrorCode()` and `lookupProblemTitle()` exported from constants module, consolidating type-widening casts into reusable functions.
+
 ## [0.12.0] - 2026-04-03
 
 ### Changed
@@ -235,6 +249,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - NestJS v10 and v11 support
 - @nestjs/swagger v7, v8, and v11 support
 
+[0.13.0]: https://github.com/ksyq12/nestjs-safe-response/releases/tag/v0.13.0
 [0.12.0]: https://github.com/ksyq12/nestjs-safe-response/releases/tag/v0.12.0
 [0.11.0]: https://github.com/ksyq12/nestjs-safe-response/releases/tag/v0.11.0
 [0.10.0]: https://github.com/ksyq12/nestjs-safe-response/releases/tag/v0.10.0
