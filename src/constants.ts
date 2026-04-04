@@ -49,3 +49,13 @@ export const DEFAULT_ERROR_CODE_MAP = {
   502: 'BAD_GATEWAY',
   503: 'SERVICE_UNAVAILABLE',
 } as const;
+
+/** Look up an error code by HTTP status. Returns undefined for unmapped status codes. */
+export function lookupErrorCode(statusCode: number): string | undefined {
+  return (DEFAULT_ERROR_CODE_MAP as Record<number, string | undefined>)[statusCode];
+}
+
+/** Look up a problem title by HTTP status. Returns undefined for unmapped status codes. */
+export function lookupProblemTitle(statusCode: number): string | undefined {
+  return (DEFAULT_PROBLEM_TITLE_MAP as Record<number, string | undefined>)[statusCode];
+}

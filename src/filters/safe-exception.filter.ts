@@ -9,7 +9,7 @@ import {
 } from '@nestjs/common';
 import { HttpAdapterHost, ModuleRef } from '@nestjs/core';
 import { randomUUID } from 'node:crypto';
-import { SAFE_RESPONSE_OPTIONS, DEFAULT_ERROR_CODE_MAP, DEFAULT_PROBLEM_TITLE_MAP } from '../constants';
+import { SAFE_RESPONSE_OPTIONS, lookupErrorCode, lookupProblemTitle } from '../constants';
 import {
   SafeResponseModuleOptions,
   SafeErrorResponse,
@@ -123,7 +123,7 @@ export class SafeExceptionFilter implements ExceptionFilter {
     }
 
     if (!errorCode) {
-      errorCode = (DEFAULT_ERROR_CODE_MAP as Record<number, string | undefined>)[statusCode] ?? 'INTERNAL_SERVER_ERROR';
+      errorCode = lookupErrorCode(statusCode) ?? 'INTERNAL_SERVER_ERROR';
     }
 
     // Resolve request ID
@@ -188,7 +188,7 @@ export class SafeExceptionFilter implements ExceptionFilter {
 
       const problemBody: SafeProblemDetailsResponse = {
         type,
-        title: this.translateMessage((DEFAULT_PROBLEM_TITLE_MAP as Record<number, string | undefined>)[statusCode] ?? 'Error', request),
+        title: this.translateMessage(lookupProblemTitle(statusCode) ?? 'Error', request),
         status: statusCode,
         detail: translatedMessage,
         instance: requestUrl,

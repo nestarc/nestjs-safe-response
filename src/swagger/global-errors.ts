@@ -1,4 +1,4 @@
-import { DEFAULT_ERROR_CODE_MAP } from '../constants';
+import { lookupErrorCode } from '../constants';
 import { SafeResponseModuleOptions, ApiSafeErrorResponseConfig } from '../interfaces';
 
 // @nestjs/swagger exports OpenAPIObject but not its nested types (PathItemObject,
@@ -98,14 +98,14 @@ function normalizeConfig(config: ApiSafeErrorResponseConfig): {
   if (typeof config === 'number') {
     return {
       status: config,
-      code: (DEFAULT_ERROR_CODE_MAP as Record<number, string | undefined>)[config] ?? 'INTERNAL_SERVER_ERROR',
+      code: lookupErrorCode(config) ?? 'INTERNAL_SERVER_ERROR',
       message: 'An error occurred',
       description: `Error response (${config})`,
     };
   }
   return {
     status: config.status,
-    code: config.code ?? (DEFAULT_ERROR_CODE_MAP as Record<number, string | undefined>)[config.status] ?? 'INTERNAL_SERVER_ERROR',
+    code: config.code ?? lookupErrorCode(config.status) ?? 'INTERNAL_SERVER_ERROR',
     message: config.message ?? 'An error occurred',
     description: config.description ?? `Error response (${config.status})`,
   };

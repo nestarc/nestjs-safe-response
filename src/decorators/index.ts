@@ -7,7 +7,7 @@ import {
   ApiResponse,
   getSchemaPath,
 } from '@nestjs/swagger';
-import { RAW_RESPONSE_KEY, PAGINATED_KEY, RESPONSE_MESSAGE_KEY, SUCCESS_CODE_KEY, CURSOR_PAGINATED_KEY, PROBLEM_TYPE_KEY, SORT_META_KEY, FILTER_META_KEY, SKIP_GLOBAL_ERRORS_KEY, DEPRECATED_KEY } from '../constants';
+import { RAW_RESPONSE_KEY, PAGINATED_KEY, RESPONSE_MESSAGE_KEY, SUCCESS_CODE_KEY, CURSOR_PAGINATED_KEY, PROBLEM_TYPE_KEY, SORT_META_KEY, FILTER_META_KEY, SKIP_GLOBAL_ERRORS_KEY, DEPRECATED_KEY, lookupErrorCode } from '../constants';
 import {
   SafeSuccessResponseDto,
   SafeErrorResponseDto,
@@ -16,7 +16,6 @@ import {
   ProblemDetailsDto,
 } from '../dto/response.dto';
 import { PaginatedOptions, CursorPaginatedOptions, ApiSafeErrorResponseOptions, ApiSafeErrorResponseConfig, DeprecatedOptions } from '../interfaces';
-import { DEFAULT_ERROR_CODE_MAP } from '../constants';
 
 /**
  * Apply standard safe response wrapping + basic Swagger schema.
@@ -150,7 +149,7 @@ export function ApiSafeErrorResponse(
   options?: ApiSafeErrorResponseOptions,
 ): MethodDecorator {
   const code =
-    options?.code ?? (DEFAULT_ERROR_CODE_MAP as Record<number, string | undefined>)[status] ?? 'INTERNAL_SERVER_ERROR';
+    options?.code ?? lookupErrorCode(status) ?? 'INTERNAL_SERVER_ERROR';
   const message = options?.message ?? 'An error occurred';
   const description = options?.description ?? `Error response (${status})`;
 
