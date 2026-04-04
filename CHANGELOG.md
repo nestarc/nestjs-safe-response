@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.13.1] - 2026-04-05
+
+### Changed
+- **Package renamed** — `nestjs-safe-response` → `@nestarc/safe-response`. The old package will be deprecated on npm with a pointer to the new name.
+- Added `publishConfig.access: "public"` for scoped npm publishing.
+
 ## [0.13.0] - 2026-04-04
 
 ### Added
@@ -257,6 +263,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - NestJS v10 and v11 support
 - @nestjs/swagger v7, v8, and v11 support
 
+[0.13.1]: https://github.com/nestarc/nestjs-safe-response/releases/tag/v0.13.1
 [0.13.0]: https://github.com/nestarc/nestjs-safe-response/releases/tag/v0.13.0
 [0.12.0]: https://github.com/nestarc/nestjs-safe-response/releases/tag/v0.12.0
 [0.11.0]: https://github.com/nestarc/nestjs-safe-response/releases/tag/v0.11.0
