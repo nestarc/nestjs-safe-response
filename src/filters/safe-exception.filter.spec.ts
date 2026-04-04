@@ -1171,4 +1171,97 @@ describe('SafeExceptionFilter', () => {
       jest.restoreAllMocks();
     });
   });
+
+  // ─── Error code resolution chain ───
+
+  describe('error code resolution chain', () => {
+    it('errorCodes option overrides DEFAULT_ERROR_CODE_MAP', () => {
+      const { adapterHost, replyFn } = createMockHttpAdapterHost();
+      const filter = createFilter(adapterHost, {
+        errorCodes: { 404: 'RESOURCE_NOT_FOUND' },
+      });
+      const host = createMockArgumentsHost();
+
+      filter.catch(new NotFoundException(), host);
+
+      const body = replyFn.mock.calls[0][1];
+      expect(body.error.code).toBe('RESOURCE_NOT_FOUND');
+    });
+
+    it('errorCodeMapper takes priority over errorCodes', () => {
+      const { adapterHost, replyFn } = createMockHttpAdapterHost();
+      const filter = createFilter(adapterHost, {
+        errorCodes: { 404: 'RESOURCE_NOT_FOUND' },
+        errorCodeMapper: () => 'MAPPER_CODE',
+      });
+      const host = createMockArgumentsHost();
+
+      filter.catch(new NotFoundException(), host);
+
+      const body = replyFn.mock.calls[0][1];
+      expect(body.error.code).toBe('MAPPER_CODE');
+    });
+
+    it('errorCodeMapper receives context with statusCode and defaultCode', () => {
+      const { adapterHost, replyFn } = createMockHttpAdapterHost();
+      const mapperFn = jest.fn().mockReturnValue(undefined);
+      const filter = createFilter(adapterHost, {
+        errorCodes: { 404: 'RESOURCE_NOT_FOUND' },
+        errorCodeMapper: mapperFn,
+      });
+      const host = createMockArgumentsHost();
+      const exception = new NotFoundException();
+
+      filter.catch(exception, host);
+
+      expect(mapperFn).toHaveBeenCalledWith(exception, {
+        statusCode: 404,
+        defaultCode: 'RESOURCE_NOT_FOUND',
+      });
+    });
+
+    it('existing 1-arg errorCodeMapper still works (backward compat)', () => {
+      const { adapterHost, replyFn } = createMockHttpAdapterHost();
+      const filter = createFilter(adapterHost, {
+        errorCodeMapper: (exception: unknown) => {
+          if (exception instanceof NotFoundException) return 'LEGACY_CODE';
+          return undefined;
+        },
+      });
+      const host = createMockArgumentsHost();
+
+      filter.catch(new NotFoundException(), host);
+
+      const body = replyFn.mock.calls[0][1];
+      expect(body.error.code).toBe('LEGACY_CODE');
+    });
+
+    it('errorCodeMapper returns undefined → falls through to errorCodes', () => {
+      const { adapterHost, replyFn } = createMockHttpAdapterHost();
+      const filter = createFilter(adapterHost, {
+        errorCodes: { 404: 'CUSTOM_NOT_FOUND' },
+        errorCodeMapper: () => undefined,
+      });
+      const host = createMockArgumentsHost();
+
+      filter.catch(new NotFoundException(), host);
+
+      const body = replyFn.mock.calls[0][1];
+      expect(body.error.code).toBe('CUSTOM_NOT_FOUND');
+    });
+
+    it('full chain: mapper undefined → errorCodes miss → DEFAULT_ERROR_CODE_MAP', () => {
+      const { adapterHost, replyFn } = createMockHttpAdapterHost();
+      const filter = createFilter(adapterHost, {
+        errorCodes: { 500: 'CUSTOM_500' },
+        errorCodeMapper: () => undefined,
+      });
+      const host = createMockArgumentsHost();
+
+      filter.catch(new BadRequestException(), host);
+
+      const body = replyFn.mock.calls[0][1];
+      expect(body.error.code).toBe('BAD_REQUEST');
+    });
+  });
 });

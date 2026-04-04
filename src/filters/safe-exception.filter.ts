@@ -17,6 +17,7 @@ import {
   ProblemDetailsOptions,
   RequestIdOptions,
   DeprecatedOptions,
+  ErrorCodeMapperContext,
 } from '../interfaces';
 import { I18nAdapter } from '../adapters/i18n.adapter';
 import {
@@ -112,18 +113,24 @@ export class SafeExceptionFilter implements ExceptionFilter {
       }
     }
 
-    // Custom error code mapping (guarded: user-provided mapper must not crash the filter)
+    // Custom error code mapping — 3-step resolution chain:
+    // 1. errorCodeMapper(exception, context) → if returns string, use it
+    // 2. errorCodes[statusCode] → declarative override
+    // 3. DEFAULT_ERROR_CODE_MAP[statusCode] → built-in default
+    // 4. 'INTERNAL_SERVER_ERROR' → final fallback
     let errorCode: string | undefined;
     if (this.options.errorCodeMapper) {
       try {
-        errorCode = this.options.errorCodeMapper(exception);
+        const defaultCode = this.resolveDefaultCode(statusCode);
+        const context: ErrorCodeMapperContext = { statusCode, defaultCode };
+        errorCode = this.options.errorCodeMapper(exception, context);
       } catch {
         // Fall back to default code map if the custom mapper throws
       }
     }
 
     if (!errorCode) {
-      errorCode = lookupErrorCode(statusCode) ?? 'INTERNAL_SERVER_ERROR';
+      errorCode = this.resolveDefaultCode(statusCode);
     }
 
     // Resolve request ID
@@ -247,6 +254,12 @@ export class SafeExceptionFilter implements ExceptionFilter {
     }
 
     httpAdapter.reply(response, body, statusCode);
+  }
+
+  private resolveDefaultCode(statusCode: number): string {
+    return this.options.errorCodes?.[statusCode]
+      ?? lookupErrorCode(statusCode)
+      ?? 'INTERNAL_SERVER_ERROR';
   }
 
   private resolveRequestId(
