@@ -547,3 +547,69 @@ expectType<'INTERNAL_SERVER_ERROR'>(DEFAULT_ERROR_CODE_MAP[500]);
 
 expectType<'Bad Request'>(DEFAULT_PROBLEM_TITLE_MAP[400]);
 expectType<'Not Found'>(DEFAULT_PROBLEM_TITLE_MAP[404]);
+
+// ─── ErrorCodeMapperContext ───
+
+import type {
+  ErrorCodeMapperContext,
+  SafeEndpointOptions,
+  SafePaginatedEndpointOptions,
+  SafeCursorPaginatedEndpointOptions,
+} from './dist';
+
+const ctx: ErrorCodeMapperContext = { statusCode: 404, defaultCode: 'NOT_FOUND' };
+expectType<number>(ctx.statusCode);
+expectType<string>(ctx.defaultCode);
+
+// ─── SafeResponseModuleOptions.errorCodeMapper with context ───
+
+const optsWithMapper: SafeResponseModuleOptions = {
+  errorCodeMapper: (exception: unknown, context?: ErrorCodeMapperContext) => {
+    if (context?.statusCode === 404) return 'CUSTOM';
+    return undefined;
+  },
+};
+void optsWithMapper;
+
+// ─── SafeResponseModuleOptions.errorCodes ───
+
+const optsWithCodes: SafeResponseModuleOptions = {
+  errorCodes: { 408: 'REQUEST_TIMEOUT', 418: 'IM_A_TEAPOT' },
+};
+void optsWithCodes;
+
+// ─── SafeResponseModuleOptions.suppressWarnings ───
+
+const optsWithSuppress: SafeResponseModuleOptions = {
+  suppressWarnings: true,
+};
+void optsWithSuppress;
+
+// ─── Composite decorator options ───
+
+const endpointOpts: SafeEndpointOptions = {
+  statusCode: 201,
+  isArray: true,
+  description: 'List items',
+  sort: true,
+  filter: true,
+  message: 'Fetched',
+  code: 'OK',
+  errors: [400, { status: 404, code: 'NOT_FOUND' }],
+  deprecated: { sunset: '2026-12-31' },
+};
+void endpointOpts;
+
+const paginatedOpts: SafePaginatedEndpointOptions = {
+  maxLimit: 100,
+  links: true,
+  sort: true,
+  filter: true,
+};
+void paginatedOpts;
+
+const cursorPaginatedOpts: SafeCursorPaginatedEndpointOptions = {
+  maxLimit: 50,
+  links: true,
+};
+void cursorPaginatedOpts;
