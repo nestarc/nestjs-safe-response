@@ -90,6 +90,12 @@ export interface SafeResponseModuleOptions {
   suppressWarnings?: boolean;
   /** Declarative error code map. Merged on top of DEFAULT_ERROR_CODE_MAP. Use for simple status-to-code mappings. */
   errorCodes?: Record<number, string>;
+  /** API version string to include in every response's meta.apiVersion. */
+  version?: string;
+  /** Error catalog for centralized error definitions. Created via defineErrors(). */
+  errorCatalog?: import('../errors').ErrorCatalog;
+  /** Enable partial response via field selection query parameter. true uses defaults, or pass options. */
+  fieldSelection?: boolean | import('../shared/field-selection').FieldSelectionOptions;
 }
 
 export interface ProblemDetailsOptions {

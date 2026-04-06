@@ -5,6 +5,7 @@ import {
   HttpCode,
   NotFoundException,
   BadRequestException,
+  StreamableFile,
 } from '@nestjs/common';
 import {
   RawResponse,
@@ -14,10 +15,12 @@ import {
   SuccessCode,
   ProblemType,
   Deprecated,
+  FieldSelection,
   SafeEndpoint,
   SafePaginatedEndpoint,
   SafeCursorPaginatedEndpoint,
 } from '../../src/decorators';
+import { SafeException } from '../../src/errors';
 import { ApiProperty } from '@nestjs/swagger';
 import { Exclude } from 'class-transformer';
 
@@ -245,5 +248,43 @@ export class TestController {
       hasMore: true,
       limit: 10,
     };
+  }
+
+  @Get('streamable-file')
+  streamableFile() {
+    return new StreamableFile(Buffer.from('hello world'));
+  }
+
+  @Get('catalog-error')
+  catalogError() {
+    throw new SafeException('USER_NOT_FOUND');
+  }
+
+  @Get('catalog-error-override')
+  catalogErrorOverride() {
+    throw new SafeException('USER_NOT_FOUND', { message: 'Custom not found message' });
+  }
+
+  @Get('catalog-error-unknown')
+  catalogErrorUnknown() {
+    throw new SafeException('UNKNOWN_ERROR_KEY');
+  }
+
+  @Get('field-selection')
+  @FieldSelection()
+  fieldSelection() {
+    return { id: 1, name: 'John', email: 'john@test.com', secret: 'hidden' };
+  }
+
+  @Get('field-selection-nested')
+  @FieldSelection()
+  fieldSelectionNested() {
+    return { id: 1, name: 'John', address: { city: 'Seoul', zip: '12345' } };
+  }
+
+  @Get('field-selection-disabled')
+  @FieldSelection(false)
+  fieldSelectionDisabled() {
+    return { id: 1, name: 'John', email: 'john@test.com' };
   }
 }

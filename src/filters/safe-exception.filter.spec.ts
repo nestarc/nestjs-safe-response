@@ -8,6 +8,7 @@ import {
   NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
+import { SafeException, defineErrors } from '../errors';
 import { HttpAdapterHost } from '@nestjs/core';
 import { SafeExceptionFilter } from './safe-exception.filter';
 import { SafeResponseModuleOptions } from '../interfaces';
@@ -1290,6 +1291,153 @@ describe('SafeExceptionFilter', () => {
 
       const body = replyFn.mock.calls[0][1];
       expect(body.error.code).toBe('BAD_REQUEST');
+    });
+  });
+
+  // ─── Error Catalog ───
+
+  describe('에러 카탈로그 (SafeException)', () => {
+    const catalog = defineErrors({
+      USER_NOT_FOUND: { status: 404, message: 'User not found' },
+      EMAIL_TAKEN: { status: 409, message: 'Email already registered' },
+      VALIDATION_ERROR: { status: 400, message: 'Validation failed', details: ['default detail'] },
+    });
+
+    it('카탈로그에서 status/message/code 해석', () => {
+      const { adapterHost, replyFn } = createMockHttpAdapterHost();
+      const filter = createFilter(adapterHost, { errorCatalog: catalog });
+      const host = createMockArgumentsHost();
+
+      filter.catch(new SafeException('USER_NOT_FOUND'), host);
+
+      const [, body, status] = replyFn.mock.calls[0];
+      expect(status).toBe(404);
+      expect(body.error.code).toBe('USER_NOT_FOUND');
+      expect(body.error.message).toBe('User not found');
+    });
+
+    it('message 오버라이드', () => {
+      const { adapterHost, replyFn } = createMockHttpAdapterHost();
+      const filter = createFilter(adapterHost, { errorCatalog: catalog });
+      const host = createMockArgumentsHost();
+
+      filter.catch(new SafeException('USER_NOT_FOUND', { message: 'Custom msg' }), host);
+
+      const body = replyFn.mock.calls[0][1];
+      expect(body.error.message).toBe('Custom msg');
+      expect(body.error.code).toBe('USER_NOT_FOUND');
+    });
+
+    it('details 오버라이드', () => {
+      const { adapterHost, replyFn } = createMockHttpAdapterHost();
+      const filter = createFilter(adapterHost, { errorCatalog: catalog });
+      const host = createMockArgumentsHost();
+
+      filter.catch(new SafeException('VALIDATION_ERROR', { details: ['custom detail'] }), host);
+
+      const body = replyFn.mock.calls[0][1];
+      expect(body.error.details).toEqual(['custom detail']);
+    });
+
+    it('카탈로그 기본 details 사용', () => {
+      const { adapterHost, replyFn } = createMockHttpAdapterHost();
+      const filter = createFilter(adapterHost, { errorCatalog: catalog });
+      const host = createMockArgumentsHost();
+
+      filter.catch(new SafeException('VALIDATION_ERROR'), host);
+
+      const body = replyFn.mock.calls[0][1];
+      expect(body.error.details).toEqual(['default detail']);
+    });
+
+    it('카탈로그에 없는 키 → 500, 키를 message로 사용', () => {
+      const { adapterHost, replyFn } = createMockHttpAdapterHost();
+      const filter = createFilter(adapterHost, { errorCatalog: catalog });
+      const host = createMockArgumentsHost();
+
+      filter.catch(new SafeException('UNKNOWN_KEY'), host);
+
+      const [, body, status] = replyFn.mock.calls[0];
+      expect(status).toBe(500);
+      expect(body.error.code).toBe('UNKNOWN_KEY');
+      expect(body.error.message).toBe('UNKNOWN_KEY');
+    });
+
+    it('카탈로그 없이 SafeException → 500, 키를 code/message로 사용', () => {
+      const { adapterHost, replyFn } = createMockHttpAdapterHost();
+      const filter = createFilter(adapterHost, {});
+      const host = createMockArgumentsHost();
+
+      filter.catch(new SafeException('SOME_ERROR'), host);
+
+      const [, body, status] = replyFn.mock.calls[0];
+      expect(status).toBe(500);
+      expect(body.error.code).toBe('SOME_ERROR');
+    });
+
+    it('errorCodeMapper가 SafeException의 카탈로그 코드를 오버라이드하지 않음', () => {
+      const { adapterHost, replyFn } = createMockHttpAdapterHost();
+      const filter = createFilter(adapterHost, {
+        errorCatalog: catalog,
+        errorCodeMapper: () => 'OVERRIDDEN',
+      });
+      const host = createMockArgumentsHost();
+
+      filter.catch(new SafeException('USER_NOT_FOUND'), host);
+
+      const body = replyFn.mock.calls[0][1];
+      // catalogErrorCode takes priority
+      expect(body.error.code).toBe('USER_NOT_FOUND');
+    });
+
+    it('problemDetails 모드에서도 카탈로그 해석 동작', () => {
+      const { adapterHost, replyFn } = createMockHttpAdapterHost();
+      const filter = createFilter(adapterHost, { errorCatalog: catalog, problemDetails: true });
+      const host = createMockArgumentsHost();
+
+      filter.catch(new SafeException('EMAIL_TAKEN'), host);
+
+      const [, body, status] = replyFn.mock.calls[0];
+      expect(status).toBe(409);
+      expect(body.code).toBe('EMAIL_TAKEN');
+      expect(body.detail).toBe('Email already registered');
+    });
+  });
+
+  // ─── API Version Metadata ───
+
+  describe('API version metadata', () => {
+    it('version 옵션 설정 시 에러 응답에 meta.apiVersion 포함', () => {
+      const { adapterHost, replyFn } = createMockHttpAdapterHost();
+      const filter = createFilter(adapterHost, { version: '2.1.0' });
+      const host = createMockArgumentsHost();
+
+      filter.catch(new NotFoundException(), host);
+
+      const body = replyFn.mock.calls[0][1];
+      expect(body.meta?.apiVersion).toBe('2.1.0');
+    });
+
+    it('version 옵션 미설정 시 meta.apiVersion 없음', () => {
+      const { adapterHost, replyFn } = createMockHttpAdapterHost();
+      const filter = createFilter(adapterHost, {});
+      const host = createMockArgumentsHost();
+
+      filter.catch(new NotFoundException(), host);
+
+      const body = replyFn.mock.calls[0][1];
+      expect(body.meta?.apiVersion).toBeUndefined();
+    });
+
+    it('problemDetails 모드에서도 meta.apiVersion 포함', () => {
+      const { adapterHost, replyFn } = createMockHttpAdapterHost();
+      const filter = createFilter(adapterHost, { version: '3.0.0', problemDetails: true });
+      const host = createMockArgumentsHost();
+
+      filter.catch(new NotFoundException(), host);
+
+      const body = replyFn.mock.calls[0][1];
+      expect(body.meta?.apiVersion).toBe('3.0.0');
     });
   });
 });

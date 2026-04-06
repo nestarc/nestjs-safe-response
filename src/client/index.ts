@@ -75,6 +75,8 @@ export interface ResponseMeta {
   filters?: Record<string, unknown>;
   deprecation?: DeprecationMeta;
   rateLimit?: RateLimitMeta;
+  apiVersion?: string;
+  fields?: string[];
   [key: string]: unknown;
 }
 
@@ -215,6 +217,17 @@ export function isDeprecated(
   meta?: ResponseMeta,
 ): meta is ResponseMeta & { deprecation: DeprecationMeta } {
   return meta?.deprecation?.deprecated === true;
+}
+
+/** Check if response meta contains field selection information */
+export function hasFieldSelection(
+  meta?: ResponseMeta,
+): meta is ResponseMeta & { fields: string[] } {
+  return (
+    meta?.fields !== undefined &&
+    Array.isArray(meta.fields) &&
+    meta.fields.length > 0
+  );
 }
 
 /** Check if response meta contains rate limit information with valid shape */

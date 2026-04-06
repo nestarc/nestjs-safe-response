@@ -15,6 +15,8 @@ Standardized API response wrapper for NestJS — auto-wraps success/error respon
 
 - **Automatic response wrapping** — all controller returns wrapped in `{ success, statusCode, data }` structure
 - **Error standardization** — exceptions converted to `{ success: false, error: { code, message, details } }`
+- **Field selection (Partial Response)** — Google-style `?fields=id,name` query parameter to select specific response fields, with dot-notation for nested fields
+- **Error catalog** — `defineErrors()` for centralized error definitions + `SafeException` to throw by key with auto-resolved status/message/code
 - **Pagination metadata** — offset (`page`/`limit`/`total`) and cursor (`nextCursor`/`hasMore`) pagination with auto-calculated meta and HATEOAS links
 - **Sort/Filter metadata** — `@SortMeta()` and `@FilterMeta()` decorators to include sorting and filtering info in response `meta`
 - **Request ID tracking** — opt-in `requestId` field in all responses with incoming header reuse, auto-generation, and response header propagation
@@ -22,7 +24,9 @@ Standardized API response wrapper for NestJS — auto-wraps success/error respon
 - **RFC 9457 Problem Details** — opt-in standard error format with `application/problem+json`
 - **Swagger integration** — `@ApiSafeResponse(Dto)` for success schemas, `@ApiSafeErrorResponse()` / `@ApiSafeErrorResponses()` for error schemas — all with the wrapped envelope
 - **Global error Swagger** — `applyGlobalErrors()` injects common error responses (401, 403, 500) into all OpenAPI operations
-- **Frontend client types** — `@nestarc/safe-response/client` provides zero-dependency TypeScript types and type guards (`isSuccess`, `isError`, `isPaginated`, `isProblemDetailsResponse`, `hasResponseTime`, `hasSort`, `hasFilters`, `isDeprecated`, `hasRateLimit`) for frontend consumers
+- **API version metadata** — opt-in `meta.apiVersion` field in all responses for version-aware clients
+- **StreamableFile auto-detection** — automatic skip of response wrapping for `StreamableFile` returns (no `@RawResponse()` needed)
+- **Frontend client types** — `@nestarc/safe-response/client` provides zero-dependency TypeScript types and type guards (`isSuccess`, `isError`, `isPaginated`, `isProblemDetailsResponse`, `hasResponseTime`, `hasSort`, `hasFilters`, `isDeprecated`, `hasRateLimit`, `hasFieldSelection`) for frontend consumers
 - **nestjs-i18n integration** — automatic error/success message translation via adapter pattern
 - **API deprecation** — `@Deprecated()` decorator with RFC 9745/8594 `Deprecation`/`Sunset` headers, Swagger `deprecated: true`, and response `meta.deprecation`
 - **Rate limit metadata** — opt-in `meta.rateLimit` mirroring of `X-RateLimit-*` response headers for frontend consumption
@@ -731,6 +735,104 @@ SafeResponseModule.register({
 })
 ```
 
+## Field Selection (Partial Response)
+
+Enable Google-style `?fields=id,name` query parameter to select specific fields from the response data.
+
+```typescript
+// Per-route: decorator
+@Get(':id')
+@FieldSelection()
+@ApiSafeResponse(UserDto)
+findOne(@Param('id') id: string) {
+  return this.usersService.findOne(id);
+}
+
+// Or global: module option
+SafeResponseModule.register({
+  fieldSelection: true,  // enable for all routes
+})
+```
+
+Request: `GET /api/users/1?fields=id,name,address.city`
+
+Response:
+
+```json
+{
+  "success": true,
+  "statusCode": 200,
+  "data": { "id": 1, "name": "John", "address": { "city": "Seoul" } },
+  "meta": { "fields": ["id", "name", "address.city"] }
+}
+```
+
+- Dot-notation for nested fields (`address.city`)
+- Arrays: applied to each element
+- Non-existent fields: silently skipped
+- Decorator takes priority over module option; pass `@FieldSelection(false)` to disable on a specific route
+
+### Custom Options
+
+```typescript
+@FieldSelection({
+  queryParam: 'select',   // custom parameter name (default: 'fields')
+  separator: ';',          // custom separator (default: ',')
+  maxDepth: 2,             // limit nesting depth (default: 3)
+})
+```
+
+## Error Catalog
+
+Define errors centrally and throw by key — no more scattered status codes and messages.
+
+```typescript
+import { defineErrors, SafeException, SafeResponseModule } from '@nestarc/safe-response';
+
+// 1. Define errors
+const errors = defineErrors({
+  USER_NOT_FOUND: { status: 404, message: 'User not found' },
+  EMAIL_TAKEN: { status: 409, message: 'Email already registered' },
+  VALIDATION_ERROR: { status: 400, message: 'Validation failed', details: ['field is required'] },
+});
+
+// 2. Register
+SafeResponseModule.register({ errorCatalog: errors });
+
+// 3. Throw by key
+throw new SafeException('USER_NOT_FOUND');
+// → { success: false, statusCode: 404, error: { code: 'USER_NOT_FOUND', message: 'User not found' } }
+
+// Override message or details per throw
+throw new SafeException('USER_NOT_FOUND', { message: 'Profile not found' });
+throw new SafeException('VALIDATION_ERROR', { details: ['email is invalid'] });
+```
+
+Error code resolution order: `SafeException.errorKey` > `errorCodeMapper` > `errorCodes` > `DEFAULT_ERROR_CODE_MAP` > `'INTERNAL_SERVER_ERROR'`
+
+## API Version Metadata
+
+Include the API version in every response for version-aware clients.
+
+```typescript
+SafeResponseModule.register({
+  version: '2.1.0',
+})
+```
+
+Response:
+
+```json
+{
+  "success": true,
+  "statusCode": 200,
+  "data": { "..." },
+  "meta": { "apiVersion": "2.1.0" }
+}
+```
+
+Included in both success and error responses (standard and Problem Details formats).
+
 ## Module Options
 
 ```typescript
@@ -774,6 +876,9 @@ SafeResponseModule.registerAsync({
 | `rateLimit` | `boolean \| RateLimitOptions` | `undefined` | Mirror rate limit response headers into `meta.rateLimit` |
 | `i18n` | `boolean \| I18nAdapter` | `undefined` | Enable i18n for error/success messages. `true` auto-detects `nestjs-i18n`, or pass a custom adapter. |
 | `errorCodes` | `Record<number, string>` | `undefined` | Declarative error code map merged on top of `DEFAULT_ERROR_CODE_MAP` |
+| `version` | `string` | `undefined` | API version string included in every response's `meta.apiVersion` |
+| `errorCatalog` | `ErrorCatalog` | `undefined` | Centralized error definitions created via `defineErrors()`. Used by `SafeException` for status/message resolution. |
+| `fieldSelection` | `boolean \| FieldSelectionOptions` | `undefined` | Enable partial response via `?fields=` query parameter for all routes |
 | `suppressWarnings` | `boolean` | `false` | Suppress shape-mismatch warnings for `@Paginated`, `@CursorPaginated`, `@SortMeta`, `@FilterMeta` |
 
 #### Success Code Mapping
@@ -877,9 +982,9 @@ This library is built with multiple layers of verification to ensure production 
 
 | Category | Count | What it covers |
 |----------|-------|----------------|
-| Unit tests | 427 | Interceptor, Exception Filter, Module DI, Decorators, Client Type Guards, i18n Adapter, Global Errors, Shared Utilities |
-| E2E tests (Express) | 51 | Full HTTP request/response cycle including composite decorators and declarative error codes |
-| E2E tests (Fastify) | 51 | Full platform parity with Express — all features verified on Fastify |
+| Unit tests | 473 | Interceptor, Exception Filter, Module DI, Decorators, Client Type Guards, i18n Adapter, Global Errors, Shared Utilities, Error Catalog, Field Selection |
+| E2E tests (Express) | 65 | Full HTTP request/response cycle including composite decorators, declarative error codes, field selection, error catalog, and StreamableFile |
+| E2E tests (Fastify) | 56 | Full platform parity with Express — all features verified on Fastify |
 | E2E tests (Swagger) | 41 | OpenAPI schema output verification including Problem Details and Global Errors |
 | Type tests | 84 | Public API type signature via `tsd` including client type guards and composite decorator options |
 | Snapshots | 2 | Swagger `components/schemas` + `paths` regression detection |

@@ -7,7 +7,7 @@ import {
   ApiResponse,
   getSchemaPath,
 } from '@nestjs/swagger';
-import { RAW_RESPONSE_KEY, PAGINATED_KEY, RESPONSE_MESSAGE_KEY, SUCCESS_CODE_KEY, CURSOR_PAGINATED_KEY, PROBLEM_TYPE_KEY, SORT_META_KEY, FILTER_META_KEY, SKIP_GLOBAL_ERRORS_KEY, DEPRECATED_KEY, lookupErrorCode, lookupProblemTitle } from '../constants';
+import { RAW_RESPONSE_KEY, PAGINATED_KEY, RESPONSE_MESSAGE_KEY, SUCCESS_CODE_KEY, CURSOR_PAGINATED_KEY, PROBLEM_TYPE_KEY, SORT_META_KEY, FILTER_META_KEY, SKIP_GLOBAL_ERRORS_KEY, DEPRECATED_KEY, FIELD_SELECTION_KEY, lookupErrorCode, lookupProblemTitle } from '../constants';
 import {
   SafeSuccessResponseDto,
   SafeErrorResponseDto,
@@ -16,6 +16,7 @@ import {
   ProblemDetailsDto,
 } from '../dto/response.dto';
 import { PaginatedOptions, CursorPaginatedOptions, ApiSafeErrorResponseOptions, ApiSafeErrorResponseConfig, DeprecatedOptions, SafeEndpointOptions, SafePaginatedEndpointOptions, SafeCursorPaginatedEndpointOptions } from '../interfaces';
+import { FieldSelectionOptions } from '../shared/field-selection';
 
 /**
  * Apply standard safe response wrapping + basic Swagger schema.
@@ -298,6 +299,14 @@ export const SortMeta = () => SetMetadata(SORT_META_KEY, true);
  * The handler must return a `filters` field in the paginated result.
  */
 export const FilterMeta = () => SetMetadata(FILTER_META_KEY, true);
+
+/**
+ * Enable field selection (partial response) for this route.
+ * Allows clients to specify `?fields=id,name` to receive only selected fields.
+ * Pass `false` to explicitly disable field selection on a route when the module-level option is enabled.
+ */
+export const FieldSelection = (options?: FieldSelectionOptions | false) =>
+  SetMetadata(FIELD_SELECTION_KEY, options ?? true);
 
 /**
  * Skip global error responses for this route.

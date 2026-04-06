@@ -21,6 +21,9 @@ import {
   TestAppProblemDetailsBaseUrlModule,
   TestAppProblemDetailsFullModule,
   TestAppRateLimitModule,
+  TestAppVersionModule,
+  TestAppErrorCatalogModule,
+  TestAppFieldSelectionModule,
 } from './test-app.module';
 
 describe('SafeResponse E2E (Fastify)', () => {
@@ -707,6 +710,91 @@ describe('SafeResponse E2E (Fastify)', () => {
         .expect(200);
 
       expect(res.body.meta?.rateLimit).toBeUndefined();
+    });
+  });
+
+  describe('API version metadata', () => {
+    beforeEach(async () => {
+      app = await createFastifyApp(TestAppVersionModule);
+    });
+
+    it('성공 응답에 meta.apiVersion 포함', async () => {
+      const res = await request(app.getHttpServer())
+        .get('/test')
+        .expect(200);
+
+      expect(res.body.meta.apiVersion).toBe('2.1.0');
+    });
+
+    it('에러 응답에 meta.apiVersion 포함', async () => {
+      const res = await request(app.getHttpServer())
+        .get('/test/not-found')
+        .expect(404);
+
+      expect(res.body.meta.apiVersion).toBe('2.1.0');
+    });
+  });
+
+  describe('에러 카탈로그 (SafeException)', () => {
+    beforeEach(async () => {
+      app = await createFastifyApp(TestAppErrorCatalogModule);
+    });
+
+    it('카탈로그에서 status/code/message 해석', async () => {
+      const res = await request(app.getHttpServer())
+        .get('/test/catalog-error')
+        .expect(404);
+
+      expect(res.body.success).toBe(false);
+      expect(res.body.error.code).toBe('USER_NOT_FOUND');
+      expect(res.body.error.message).toBe('User not found');
+    });
+
+    it('카탈로그에 없는 키 → 500', async () => {
+      const res = await request(app.getHttpServer())
+        .get('/test/catalog-error-unknown')
+        .expect(500);
+
+      expect(res.body.error.code).toBe('UNKNOWN_ERROR_KEY');
+    });
+  });
+
+  describe('필드 선택 (Partial Response)', () => {
+    beforeEach(async () => {
+      app = await createFastifyApp(TestAppModule);
+    });
+
+    it('?fields=id,name → 선택 필드만 반환', async () => {
+      const res = await request(app.getHttpServer())
+        .get('/test/field-selection?fields=id,name')
+        .expect(200);
+
+      expect(res.body.data).toEqual({ id: 1, name: 'John' });
+      expect(res.body.meta.fields).toEqual(['id', 'name']);
+    });
+
+    it('fields 파라미터 없으면 전체 반환', async () => {
+      const res = await request(app.getHttpServer())
+        .get('/test/field-selection')
+        .expect(200);
+
+      expect(res.body.data).toEqual({ id: 1, name: 'John', email: 'john@test.com', secret: 'hidden' });
+    });
+  });
+
+  describe('StreamableFile 자동감지', () => {
+    beforeEach(async () => {
+      app = await createFastifyApp(TestAppModule);
+    });
+
+    it('StreamableFile 반환 시 래핑 없이 원본 바이너리 전달', async () => {
+      const res = await request(app.getHttpServer())
+        .get('/test/streamable-file')
+        .expect(200)
+        .buffer(true);
+
+      expect(Buffer.isBuffer(res.body)).toBe(true);
+      expect(res.body.toString()).toBe('hello world');
     });
   });
 });

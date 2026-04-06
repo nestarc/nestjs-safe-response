@@ -1,4 +1,4 @@
-import { CallHandler, ExecutionContext, Logger } from '@nestjs/common';
+import { CallHandler, ExecutionContext, Logger, StreamableFile } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { of, lastValueFrom } from 'rxjs';
 import { SafeResponseInterceptor } from './safe-response.interceptor';
@@ -233,6 +233,51 @@ describe('SafeResponseInterceptor', () => {
       );
 
       expect(result.success).toBe(true);
+    });
+  });
+
+  // ─── StreamableFile 자동감지 ───
+
+  describe('StreamableFile 자동감지', () => {
+    it('StreamableFile 반환 시 래핑 없이 원본 반환', async () => {
+      jest.spyOn(reflector, 'get').mockReturnValue(undefined);
+      const interceptor = createInterceptor();
+      const ctx = createMockExecutionContext();
+      const file = new StreamableFile(Buffer.from('hello'));
+
+      const result = await lastValueFrom(
+        interceptor.intercept(ctx, createMockCallHandler(file)),
+      );
+
+      expect(result).toBeInstanceOf(StreamableFile);
+      expect(result).toBe(file);
+    });
+
+    it('StreamableFile은 @RawResponse() 없이도 자동 스킵', async () => {
+      jest.spyOn(reflector, 'get').mockReturnValue(undefined);
+      const interceptor = createInterceptor({ timestamp: true, path: true });
+      const ctx = createMockExecutionContext();
+      const file = new StreamableFile(Buffer.from('binary data'));
+
+      const result = await lastValueFrom(
+        interceptor.intercept(ctx, createMockCallHandler(file)),
+      );
+
+      expect(result.success).toBeUndefined();
+      expect(result.statusCode).toBeUndefined();
+    });
+
+    it('일반 객체는 StreamableFile이 아니므로 정상 래핑', async () => {
+      jest.spyOn(reflector, 'get').mockReturnValue(undefined);
+      const interceptor = createInterceptor();
+      const ctx = createMockExecutionContext();
+
+      const result = await lastValueFrom(
+        interceptor.intercept(ctx, createMockCallHandler({ id: 1 })),
+      );
+
+      expect(result.success).toBe(true);
+      expect(result.data).toEqual({ id: 1 });
     });
   });
 
@@ -1995,6 +2040,50 @@ describe('SafeResponseInterceptor', () => {
   });
 
   // ─── Shape-mismatch warnings ───
+
+  // ─── API Version Metadata ───
+
+  describe('API version metadata', () => {
+    it('version 옵션 설정 시 meta.apiVersion 포함', async () => {
+      jest.spyOn(reflector, 'get').mockReturnValue(undefined);
+      const interceptor = createInterceptor({ version: '2.1.0' });
+      const ctx = createMockExecutionContext();
+
+      const result = await lastValueFrom(
+        interceptor.intercept(ctx, createMockCallHandler({ id: 1 })),
+      );
+
+      expect(result.meta?.apiVersion).toBe('2.1.0');
+    });
+
+    it('version 옵션 미설정 시 meta.apiVersion 없음', async () => {
+      jest.spyOn(reflector, 'get').mockReturnValue(undefined);
+      const interceptor = createInterceptor();
+      const ctx = createMockExecutionContext();
+
+      const result = await lastValueFrom(
+        interceptor.intercept(ctx, createMockCallHandler({ id: 1 })),
+      );
+
+      expect(result.meta?.apiVersion).toBeUndefined();
+    });
+
+    it('다른 meta 필드와 함께 apiVersion 공존', async () => {
+      jest.spyOn(reflector, 'get').mockImplementation((key) => {
+        if (key === RESPONSE_MESSAGE_KEY) return 'hello';
+        return undefined;
+      });
+      const interceptor = createInterceptor({ version: '1.0.0' });
+      const ctx = createMockExecutionContext();
+
+      const result = await lastValueFrom(
+        interceptor.intercept(ctx, createMockCallHandler({ id: 1 })),
+      );
+
+      expect(result.meta?.apiVersion).toBe('1.0.0');
+      expect(result.meta?.message).toBe('hello');
+    });
+  });
 
   describe('shape-mismatch warnings', () => {
     let loggerWarnSpy: jest.SpyInstance;

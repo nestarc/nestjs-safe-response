@@ -21,6 +21,8 @@ export const FILTER_META_KEY = 'FILTER_META';
 export const SKIP_GLOBAL_ERRORS_KEY = 'SKIP_GLOBAL_ERRORS';
 /** @internal Decorator metadata key. Will be removed from public exports in v1.0.0. */
 export const DEPRECATED_KEY = 'DEPRECATED';
+/** @internal Decorator metadata key. Will be removed from public exports in v1.0.0. */
+export const FIELD_SELECTION_KEY = 'FIELD_SELECTION';
 
 export const DEFAULT_PROBLEM_TITLE_MAP = {
   400: 'Bad Request',

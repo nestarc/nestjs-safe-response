@@ -105,6 +105,11 @@ exports[`Swagger Schema E2E API 계약 스냅샷 components/schemas가 변경되
   },
   "ErrorResponseMetaDto": {
     "properties": {
+      "apiVersion": {
+        "description": "API version",
+        "example": "2.1.0",
+        "type": "string",
+      },
       "deprecation": {
         "allOf": [
           {
@@ -305,6 +310,11 @@ exports[`Swagger Schema E2E API 계약 스냅샷 components/schemas가 변경되
   },
   "ResponseMetaDto": {
     "properties": {
+      "apiVersion": {
+        "description": "API version",
+        "example": "2.1.0",
+        "type": "string",
+      },
       "deprecation": {
         "allOf": [
           {
@@ -312,6 +322,17 @@ exports[`Swagger Schema E2E API 계약 스냅샷 components/schemas가 변경되
           },
         ],
         "description": "Endpoint deprecation information",
+      },
+      "fields": {
+        "description": "Selected response fields (partial response)",
+        "example": [
+          "id",
+          "name",
+        ],
+        "items": {
+          "type": "string",
+        },
+        "type": "array",
       },
       "filters": {
         "description": "Applied filters",

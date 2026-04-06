@@ -6,6 +6,7 @@ import {
   Logger,
   NestInterceptor,
   Optional,
+  StreamableFile,
 } from '@nestjs/common';
 import { ModuleRef, Reflector } from '@nestjs/core';
 import { Observable, map } from 'rxjs';
@@ -22,6 +23,7 @@ import {
   SORT_META_KEY,
   FILTER_META_KEY,
   DEPRECATED_KEY,
+  FIELD_SELECTION_KEY,
 } from '../constants';
 import {
   SafeResponseModuleOptions,
@@ -55,6 +57,7 @@ import {
   setDeprecationHeaders,
   extractRateLimitMeta,
 } from '../shared/response-helpers';
+import { FieldSelectionOptions, parseFieldSelection, pickFields } from '../shared/field-selection';
 
 @Injectable()
 export class SafeResponseInterceptor implements NestInterceptor {
@@ -167,6 +170,9 @@ export class SafeResponseInterceptor implements NestInterceptor {
 
     return next.handle().pipe(
       map((data) => {
+        // StreamableFile 자동감지 — @RawResponse() 없이도 래핑 스킵
+        if (data instanceof StreamableFile) return data;
+
         // v0.3.0: 래핑 전 데이터 변환 훅
         if (this.options.transformResponse) {
           data = this.options.transformResponse(data);
@@ -278,6 +284,11 @@ export class SafeResponseInterceptor implements NestInterceptor {
           Object.assign(meta, contextMeta);
         }
 
+        // API version metadata
+        if (this.options.version) {
+          meta.apiVersion = this.options.version;
+        }
+
         // Deprecation metadata
         if (deprecatedOptions) {
           meta.deprecation = buildDeprecationMeta(deprecatedOptions);
@@ -292,6 +303,28 @@ export class SafeResponseInterceptor implements NestInterceptor {
         // Response time
         if (includeResponseTime && startTime !== undefined) {
           meta.responseTime = Math.round(performance.now() - startTime);
+        }
+
+        // Field selection (partial response)
+        // Resolution: decorator (true/false/options) > module option > disabled.
+        // Decorator `false` explicitly disables even when module option is enabled.
+        const fieldSelectionDecorator = this.reflector.get<FieldSelectionOptions | boolean>(
+          FIELD_SELECTION_KEY, handler,
+        );
+        const fieldSelectionEnabled = fieldSelectionDecorator !== undefined
+          ? fieldSelectionDecorator
+          : this.options.fieldSelection;
+        if (fieldSelectionEnabled) {
+          const config: FieldSelectionOptions = typeof fieldSelectionEnabled === 'object'
+            ? fieldSelectionEnabled : {};
+          const queryParam = config.queryParam ?? 'fields';
+          const url = new URL(request.url ?? '', 'http://localhost');
+          const fieldsParam = url.searchParams.get(queryParam) ?? undefined;
+          const selectedFields = parseFieldSelection(fieldsParam, config.separator ?? ',');
+          if (selectedFields) {
+            response.data = pickFields(response.data, selectedFields, config.maxDepth ?? 3);
+            meta.fields = selectedFields;
+          }
         }
 
         // Assign meta only if it has fields

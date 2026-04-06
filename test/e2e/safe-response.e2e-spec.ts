@@ -19,6 +19,9 @@ import {
   TestAppProblemDetailsFullModule,
   TestAppRateLimitModule,
   TestAppCustomErrorCodesModule,
+  TestAppVersionModule,
+  TestAppErrorCatalogModule,
+  TestAppFieldSelectionModule,
 } from './test-app.module';
 
 describe('SafeResponse E2E', () => {
@@ -774,6 +777,145 @@ describe('SafeResponse E2E', () => {
         .expect(404);
 
       expect(res.body.error.code).toBe('RESOURCE_NOT_FOUND');
+    });
+  });
+
+  describe('API version metadata', () => {
+    beforeEach(async () => {
+      app = await createApp(TestAppVersionModule);
+    });
+
+    it('성공 응답에 meta.apiVersion 포함', async () => {
+      const res = await request(app.getHttpServer())
+        .get('/test')
+        .expect(200);
+
+      expect(res.body.meta.apiVersion).toBe('2.1.0');
+    });
+
+    it('에러 응답에 meta.apiVersion 포함', async () => {
+      const res = await request(app.getHttpServer())
+        .get('/test/not-found')
+        .expect(404);
+
+      expect(res.body.meta.apiVersion).toBe('2.1.0');
+    });
+  });
+
+  describe('에러 카탈로그 (SafeException)', () => {
+    beforeEach(async () => {
+      app = await createApp(TestAppErrorCatalogModule);
+    });
+
+    it('카탈로그에서 status/code/message 해석', async () => {
+      const res = await request(app.getHttpServer())
+        .get('/test/catalog-error')
+        .expect(404);
+
+      expect(res.body.success).toBe(false);
+      expect(res.body.error.code).toBe('USER_NOT_FOUND');
+      expect(res.body.error.message).toBe('User not found');
+    });
+
+    it('message 오버라이드', async () => {
+      const res = await request(app.getHttpServer())
+        .get('/test/catalog-error-override')
+        .expect(404);
+
+      expect(res.body.error.code).toBe('USER_NOT_FOUND');
+      expect(res.body.error.message).toBe('Custom not found message');
+    });
+
+    it('카탈로그에 없는 키 → 500', async () => {
+      const res = await request(app.getHttpServer())
+        .get('/test/catalog-error-unknown')
+        .expect(500);
+
+      expect(res.body.error.code).toBe('UNKNOWN_ERROR_KEY');
+    });
+  });
+
+  describe('필드 선택 (Partial Response)', () => {
+    describe('데코레이터 기반', () => {
+      beforeEach(async () => {
+        app = await createApp(TestAppModule);
+      });
+
+      it('?fields=id,name → 선택 필드만 반환', async () => {
+        const res = await request(app.getHttpServer())
+          .get('/test/field-selection?fields=id,name')
+          .expect(200);
+
+        expect(res.body.data).toEqual({ id: 1, name: 'John' });
+        expect(res.body.data.email).toBeUndefined();
+        expect(res.body.data.secret).toBeUndefined();
+        expect(res.body.meta.fields).toEqual(['id', 'name']);
+      });
+
+      it('fields 파라미터 없으면 전체 반환', async () => {
+        const res = await request(app.getHttpServer())
+          .get('/test/field-selection')
+          .expect(200);
+
+        expect(res.body.data).toEqual({ id: 1, name: 'John', email: 'john@test.com', secret: 'hidden' });
+        expect(res.body.meta?.fields).toBeUndefined();
+      });
+
+      it('중첩 필드 dot-notation', async () => {
+        const res = await request(app.getHttpServer())
+          .get('/test/field-selection-nested?fields=id,address.city')
+          .expect(200);
+
+        expect(res.body.data).toEqual({ id: 1, address: { city: 'Seoul' } });
+      });
+
+      it('@FieldSelection(false) → 필드 선택 비활성화', async () => {
+        const res = await request(app.getHttpServer())
+          .get('/test/field-selection-disabled?fields=id')
+          .expect(200);
+
+        expect(res.body.data).toEqual({ id: 1, name: 'John', email: 'john@test.com' });
+        expect(res.body.meta?.fields).toBeUndefined();
+      });
+    });
+
+    describe('모듈 레벨 전역 활성화', () => {
+      beforeEach(async () => {
+        app = await createApp(TestAppFieldSelectionModule);
+      });
+
+      it('모든 라우트에서 필드 선택 가능', async () => {
+        const res = await request(app.getHttpServer())
+          .get('/test?fields=id')
+          .expect(200);
+
+        expect(res.body.data).toEqual({ id: 1 });
+        expect(res.body.meta.fields).toEqual(['id']);
+      });
+
+      it('@FieldSelection(false) 데코레이터로 개별 비활성화', async () => {
+        const res = await request(app.getHttpServer())
+          .get('/test/field-selection-disabled?fields=id')
+          .expect(200);
+
+        expect(res.body.data).toEqual({ id: 1, name: 'John', email: 'john@test.com' });
+      });
+    });
+  });
+
+  describe('StreamableFile 자동감지', () => {
+    beforeEach(async () => {
+      app = await createApp(TestAppModule);
+    });
+
+    it('StreamableFile 반환 시 래핑 없이 원본 바이너리 전달', async () => {
+      const res = await request(app.getHttpServer())
+        .get('/test/streamable-file')
+        .expect(200)
+        .buffer(true);
+
+      expect(Buffer.isBuffer(res.body)).toBe(true);
+      expect(res.body.toString()).toBe('hello world');
     });
   });
 });

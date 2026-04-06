@@ -2,6 +2,7 @@ import { Module, NestModule, MiddlewareConsumer } from '@nestjs/common';
 import { ClassSerializerInterceptor } from '@nestjs/common';
 import { APP_INTERCEPTOR } from '@nestjs/core';
 import { SafeResponseModule } from '../../src/safe-response.module';
+import { defineErrors } from '../../src/errors';
 import { TestController } from './test.controller';
 
 @Module({
@@ -201,3 +202,38 @@ export class TestAppRateLimitModule implements NestModule {
   controllers: [TestController],
 })
 export class TestAppCustomErrorCodesModule {}
+
+@Module({
+  imports: [
+    SafeResponseModule.register({
+      version: '2.1.0',
+    }),
+  ],
+  controllers: [TestController],
+})
+export class TestAppVersionModule {}
+
+const testErrorCatalog = defineErrors({
+  USER_NOT_FOUND: { status: 404, message: 'User not found' },
+  EMAIL_TAKEN: { status: 409, message: 'Email already registered' },
+});
+
+@Module({
+  imports: [
+    SafeResponseModule.register({
+      errorCatalog: testErrorCatalog,
+    }),
+  ],
+  controllers: [TestController],
+})
+export class TestAppErrorCatalogModule {}
+
+@Module({
+  imports: [
+    SafeResponseModule.register({
+      fieldSelection: true,
+    }),
+  ],
+  controllers: [TestController],
+})
+export class TestAppFieldSelectionModule {}

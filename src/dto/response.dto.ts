@@ -142,6 +142,12 @@ export class ResponseMetaDto {
 
   @ApiPropertyOptional({ type: RateLimitMetaDto, description: 'Rate limit status' })
   rateLimit?: RateLimitMetaDto;
+
+  @ApiPropertyOptional({ example: '2.1.0', description: 'API version' })
+  apiVersion?: string;
+
+  @ApiPropertyOptional({ type: [String], example: ['id', 'name'], description: 'Selected response fields (partial response)' })
+  fields?: string[];
 }
 
 export class SafeSuccessResponseDto {
@@ -192,6 +198,9 @@ export class ErrorResponseMetaDto {
 
   @ApiPropertyOptional({ type: RateLimitMetaDto, description: 'Rate limit status' })
   rateLimit?: RateLimitMetaDto;
+
+  @ApiPropertyOptional({ example: '2.1.0', description: 'API version' })
+  apiVersion?: string;
 
   /** Additional context fields (e.g., traceId, correlationId) injected via CLS */
   [key: string]: unknown;

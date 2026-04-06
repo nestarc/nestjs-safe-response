@@ -5,6 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.14.0] - 2026-04-06
+
+### Added
+- **Field selection (Partial Response)** — `@FieldSelection()` decorator and `fieldSelection` module option enable Google-style `?fields=id,name` query parameter for selecting specific fields from response data. Supports dot-notation for nested fields (`address.city`), arrays, configurable query parameter name/separator, and `maxDepth` limit. Decorator takes priority over module option; pass `false` to explicitly disable on a route.
+- **Error catalog** — `defineErrors()` utility and `SafeException` custom exception for centralized error definitions. Define errors once with status/message/details, throw by key. The filter resolves status code, message, and error code from the catalog automatically. Works with both standard and RFC 9457 Problem Details error formats.
+- **API version metadata** — `version` module option adds `meta.apiVersion` to all success and error responses. Included in both standard and Problem Details formats.
+- **StreamableFile auto-detection** — the interceptor now automatically skips response wrapping when the handler returns a `StreamableFile` instance. No need for `@RawResponse()` on file download endpoints.
+- `FieldSelection` decorator export
+- `FieldSelectionOptions` type export
+- `FIELD_SELECTION_KEY` constant export
+- `defineErrors`, `SafeException`, `ErrorDefinition`, `ErrorCatalog` exports
+- `hasFieldSelection(meta)` client type guard in `@nestarc/safe-response/client`
+- `ResponseMeta.apiVersion` and `ResponseMeta.fields` fields in both server and client types
+- `ResponseMetaDto.apiVersion` and `ResponseMetaDto.fields` Swagger DTO fields
+- `ErrorResponseMetaDto.apiVersion` Swagger DTO field
+
+### Changed
+- `SafeResponseModuleOptions` now includes `version`, `errorCatalog`, and `fieldSelection` options
+- Error code resolution chain extended: `SafeException.errorKey` → `errorCodeMapper` → `errorCodes` → `DEFAULT_ERROR_CODE_MAP` → `'INTERNAL_SERVER_ERROR'`
+
 ## [0.13.1] - 2026-04-05
 
 ### Changed
@@ -263,6 +283,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - NestJS v10 and v11 support
 - @nestjs/swagger v7, v8, and v11 support
 
+[0.14.0]: https://github.com/nestarc/nestjs-safe-response/releases/tag/v0.14.0
 [0.13.1]: https://github.com/nestarc/nestjs-safe-response/releases/tag/v0.13.1
 [0.13.0]: https://github.com/nestarc/nestjs-safe-response/releases/tag/v0.13.0
 [0.12.0]: https://github.com/nestarc/nestjs-safe-response/releases/tag/v0.12.0

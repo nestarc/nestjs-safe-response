@@ -26,6 +26,7 @@ export {
   FilterMeta,
   SkipGlobalErrors,
   Deprecated,
+  FieldSelection,
   SafeEndpoint,
   SafePaginatedEndpoint,
   SafeCursorPaginatedEndpoint,
@@ -63,6 +64,10 @@ export type {
   SafeCursorPaginatedEndpointOptions,
 } from './interfaces';
 
+// Errors
+export { SafeException, defineErrors } from './errors';
+export type { ErrorDefinition, ErrorCatalog } from './errors';
+
 // Adapters
 export { I18nAdapter, I18nServiceLike, NestI18nAdapter } from './adapters/i18n.adapter';
 
@@ -84,7 +89,10 @@ export {
 } from './dto/response.dto';
 
 // Constants
-export { DEFAULT_ERROR_CODE_MAP, DEFAULT_PROBLEM_TITLE_MAP, lookupErrorCode, lookupProblemTitle, CURSOR_PAGINATED_KEY, PROBLEM_TYPE_KEY, SORT_META_KEY, FILTER_META_KEY, SKIP_GLOBAL_ERRORS_KEY, DEPRECATED_KEY } from './constants';
+export { DEFAULT_ERROR_CODE_MAP, DEFAULT_PROBLEM_TITLE_MAP, lookupErrorCode, lookupProblemTitle, CURSOR_PAGINATED_KEY, PROBLEM_TYPE_KEY, SORT_META_KEY, FILTER_META_KEY, SKIP_GLOBAL_ERRORS_KEY, DEPRECATED_KEY, FIELD_SELECTION_KEY } from './constants';
+
+// Field Selection
+export type { FieldSelectionOptions } from './shared/field-selection';
 
 // Swagger utilities
 export { applyGlobalErrors } from './swagger/global-errors';

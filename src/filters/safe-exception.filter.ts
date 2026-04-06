@@ -10,6 +10,7 @@ import {
 import { HttpAdapterHost, ModuleRef } from '@nestjs/core';
 import { randomUUID } from 'node:crypto';
 import { SAFE_RESPONSE_OPTIONS, lookupErrorCode, lookupProblemTitle } from '../constants';
+import { SafeException } from '../errors';
 import {
   SafeResponseModuleOptions,
   SafeErrorResponse,
@@ -108,8 +109,23 @@ export class SafeExceptionFilter implements ExceptionFilter {
     let statusCode = 500;
     let message = 'Internal server error';
     let details: unknown = undefined;
+    let catalogErrorCode: string | undefined;
 
-    if (exception instanceof HttpException) {
+    // SafeException: resolve from error catalog first
+    if (exception instanceof SafeException) {
+      const catalog = this.options.errorCatalog;
+      const def = catalog?.[exception.errorKey];
+      if (def) {
+        statusCode = def.status;
+        message = exception.overrideMessage ?? def.message;
+        details = exception.overrideDetails ?? def.details;
+      } else {
+        // Catalog miss — use the key as message, keep 500
+        message = exception.overrideMessage ?? exception.errorKey;
+        details = exception.overrideDetails;
+      }
+      catalogErrorCode = exception.errorKey;
+    } else if (exception instanceof HttpException) {
       statusCode = exception.getStatus();
       const exceptionResponse = exception.getResponse();
 
@@ -132,13 +148,14 @@ export class SafeExceptionFilter implements ExceptionFilter {
       }
     }
 
-    // Custom error code mapping — 3-step resolution chain:
+    // Error code resolution chain:
+    // 0. SafeException → errorKey as code (from catalog)
     // 1. errorCodeMapper(exception, context) → if returns string, use it
     // 2. errorCodes[statusCode] → declarative override
     // 3. DEFAULT_ERROR_CODE_MAP[statusCode] → built-in default
     // 4. 'INTERNAL_SERVER_ERROR' → final fallback
-    let errorCode: string | undefined;
-    if (this.options.errorCodeMapper) {
+    let errorCode: string | undefined = catalogErrorCode;
+    if (!errorCode && this.options.errorCodeMapper) {
       try {
         const defaultCode = this.resolveDefaultCode(statusCode);
         const context: ErrorCodeMapperContext = { statusCode, defaultCode };
@@ -210,7 +227,8 @@ export class SafeExceptionFilter implements ExceptionFilter {
         : {};
       const rateLimitMeta = extractRateLimitMeta(response, this.options.rateLimit);
       const rateLimitObj = rateLimitMeta ? { rateLimit: rateLimitMeta } : {};
-      const meta = { ...responseTimeMeta, ...contextMeta, ...deprecationMeta, ...rateLimitObj };
+      const versionMeta = this.options.version ? { apiVersion: this.options.version } : {};
+      const meta = { ...responseTimeMeta, ...contextMeta, ...versionMeta, ...deprecationMeta, ...rateLimitObj };
 
       const problemBody: SafeProblemDetailsResponse = {
         type,
@@ -248,7 +266,8 @@ export class SafeExceptionFilter implements ExceptionFilter {
       : {};
     const rateLimitMetaObj = extractRateLimitMeta(response, this.options.rateLimit);
     const rateLimitObj = rateLimitMetaObj ? { rateLimit: rateLimitMetaObj } : {};
-    const errorMeta = { ...responseTimeMeta, ...contextMeta, ...deprecationMetaObj, ...rateLimitObj };
+    const versionMetaObj = this.options.version ? { apiVersion: this.options.version } : {};
+    const errorMeta = { ...responseTimeMeta, ...contextMeta, ...versionMetaObj, ...deprecationMetaObj, ...rateLimitObj };
     if (Object.keys(errorMeta).length > 0) {
       body.meta = errorMeta;
     }
