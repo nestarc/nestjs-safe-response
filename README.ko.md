@@ -728,6 +728,104 @@ SafeResponseModule.register({
 })
 ```
 
+## 필드 선택 (Partial Response)
+
+Google 스타일 `?fields=id,name` 쿼리 파라미터로 응답 데이터에서 특정 필드만 선택합니다.
+
+```typescript
+// 라우트별: 데코레이터
+@Get(':id')
+@FieldSelection()
+@ApiSafeResponse(UserDto)
+findOne(@Param('id') id: string) {
+  return this.usersService.findOne(id);
+}
+
+// 전역: 모듈 옵션
+SafeResponseModule.register({
+  fieldSelection: true,  // 모든 라우트에서 활성화
+})
+```
+
+요청: `GET /api/users/1?fields=id,name,address.city`
+
+응답:
+
+```json
+{
+  "success": true,
+  "statusCode": 200,
+  "data": { "id": 1, "name": "John", "address": { "city": "Seoul" } },
+  "meta": { "fields": ["id", "name", "address.city"] }
+}
+```
+
+- 중첩 필드 dot-notation 지원 (`address.city`)
+- 배열: 각 요소에 적용
+- 존재하지 않는 필드: 자동 무시
+- 데코레이터가 모듈 옵션보다 우선; `@FieldSelection(false)`로 특정 라우트 비활성화
+
+### 커스텀 옵션
+
+```typescript
+@FieldSelection({
+  queryParam: 'select',   // 파라미터명 (기본: 'fields')
+  separator: ';',          // 구분자 (기본: ',')
+  maxDepth: 2,             // 중첩 깊이 제한 (기본: 3)
+})
+```
+
+## 에러 카탈로그
+
+에러를 중앙에서 정의하고 키로 throw — 흩어진 상태 코드와 메시지를 제거합니다.
+
+```typescript
+import { defineErrors, SafeException, SafeResponseModule } from '@nestarc/safe-response';
+
+// 1. 에러 정의
+const errors = defineErrors({
+  USER_NOT_FOUND: { status: 404, message: 'User not found' },
+  EMAIL_TAKEN: { status: 409, message: 'Email already registered' },
+  VALIDATION_ERROR: { status: 400, message: 'Validation failed', details: ['field is required'] },
+});
+
+// 2. 등록
+SafeResponseModule.register({ errorCatalog: errors });
+
+// 3. 키로 throw
+throw new SafeException('USER_NOT_FOUND');
+// → { success: false, statusCode: 404, error: { code: 'USER_NOT_FOUND', message: 'User not found' } }
+
+// throw 시 메시지나 details 오버라이드
+throw new SafeException('USER_NOT_FOUND', { message: '프로필을 찾을 수 없습니다' });
+throw new SafeException('VALIDATION_ERROR', { details: ['email이 유효하지 않습니다'] });
+```
+
+에러 코드 해석 순서: `SafeException.errorKey` > `errorCodeMapper` > `errorCodes` > `DEFAULT_ERROR_CODE_MAP` > `'INTERNAL_SERVER_ERROR'`
+
+## API 버전 메타데이터
+
+모든 응답에 API 버전을 포함합니다.
+
+```typescript
+SafeResponseModule.register({
+  version: '2.1.0',
+})
+```
+
+응답:
+
+```json
+{
+  "success": true,
+  "statusCode": 200,
+  "data": { "..." },
+  "meta": { "apiVersion": "2.1.0" }
+}
+```
+
+성공/에러 응답 모두에 포함됩니다 (표준 및 Problem Details 형식).
+
 ## 모듈 옵션
 
 ```typescript
@@ -772,6 +870,9 @@ SafeResponseModule.registerAsync({
 | `i18n` | `boolean \| I18nAdapter` | `undefined` | 에러/성공 메시지 다국어 지원. `true`는 `nestjs-i18n` 자동 감지, 또는 커스텀 어댑터 전달. |
 | `errorCodes` | `Record<number, string>` | `undefined` | `DEFAULT_ERROR_CODE_MAP` 위에 병합되는 선언적 에러 코드 맵 |
 | `suppressWarnings` | `boolean` | `false` | `@Paginated`, `@CursorPaginated`, `@SortMeta`, `@FilterMeta` 형상 불일치 경고 억제 |
+| `version` | `string` | `undefined` | 모든 응답의 `meta.apiVersion`에 포함되는 API 버전 문자열 |
+| `errorCatalog` | `ErrorCatalog` | `undefined` | `defineErrors()`로 생성한 중앙 에러 정의. `SafeException`에서 status/message 해석에 사용 |
+| `fieldSelection` | `boolean \| FieldSelectionOptions` | `undefined` | `?fields=` 쿼리 파라미터로 모든 라우트에서 부분 응답 활성화 |
 
 #### 성공 코드 매핑
 
@@ -845,7 +946,7 @@ SafeResponseModule.register({
 })
 ```
 
-해석 순서: `errorCodeMapper` > `errorCodes` > `DEFAULT_ERROR_CODE_MAP` > `'INTERNAL_SERVER_ERROR'`
+해석 순서: `SafeException.errorKey` > `errorCodeMapper` > `errorCodes` > `DEFAULT_ERROR_CODE_MAP` > `'INTERNAL_SERVER_ERROR'`
 
 ### 유틸리티 함수
 

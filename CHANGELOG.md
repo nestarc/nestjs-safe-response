@@ -25,6 +25,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `SafeResponseModuleOptions` now includes `version`, `errorCatalog`, and `fieldSelection` options
 - Error code resolution chain extended: `SafeException.errorKey` → `errorCodeMapper` → `errorCodes` → `DEFAULT_ERROR_CODE_MAP` → `'INTERNAL_SERVER_ERROR'`
 
+### Fixed
+- **Server/client type interface parity** — `apiVersion?: string` explicitly added to server `ResponseMeta`, `SafeErrorResponse.meta`, and `SafeProblemDetailsResponse.meta` in `src/interfaces/index.ts`. Client `SafeErrorResponse.meta` and `SafeProblemDetailsResponse.meta` also updated. Previously these fields were accessible via `[key: string]: unknown` index signature but lacked IDE autocomplete.
+- `fields?: string[]` added to server `ResponseMeta` (was already present in client types)
+- 60+ type assertions added to `index.test-d.ts` for `apiVersion`, `fields`, `hasFieldSelection`, `ErrorCatalog`, and `FieldSelectionOptions` to prevent future type drift
+
 ## [0.13.1] - 2026-04-05
 
 ### Changed
