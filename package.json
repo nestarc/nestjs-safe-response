@@ -44,7 +44,7 @@
     "test:cov": "jest --coverage",
     "test:e2e": "jest --config test/jest-e2e.json",
     "test:types": "npm run build && tsd --files index.test-d.ts",
-    "bench": "npx ts-node test/benchmark.ts",
+    "bench": "npx ts-node benchmarks/response-overhead.ts",
     "prepublishOnly": "npm run build"
   },
   "peerDependencies": {
