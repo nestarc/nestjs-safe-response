@@ -1046,6 +1046,21 @@ Response wrapping overhead is sub-millisecond. The benchmark uses supertest in a
 | Node.js | >= 18 |
 | RxJS | v7 |
 
+## Performance
+
+Measured with NestJS 11, 500 iterations on Apple Silicon:
+
+| Scenario | Avg | P50 | P95 | P99 |
+|----------|-----|-----|-----|-----|
+| Raw NestJS (no interceptor) | 0.61ms | 0.58ms | 0.80ms | 1.21ms |
+| **With safe-response** | **0.44ms** | **0.40ms** | **0.65ms** | **0.96ms** |
+| Error (raw) | 0.39ms | 0.37ms | 0.52ms | 0.58ms |
+| **Error (wrapped)** | **0.52ms** | **0.44ms** | **0.87ms** | **1.36ms** |
+
+Success path overhead: **< 0.2ms**. Error wrapping adds ~0.13ms.
+
+> Reproduce: `npx ts-node benchmarks/response-overhead.ts`
+
 ## License
 
 MIT
