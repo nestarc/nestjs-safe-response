@@ -1,12 +1,14 @@
-name: Publish to npm
+name: Release
 
 on:
   release:
-    types: [created]
+    types: [published]
 
 jobs:
   publish:
+    name: Publish to npm
     runs-on: ubuntu-latest
+    environment: npm
 
     permissions:
       contents: read
@@ -27,5 +29,3 @@ jobs:
       - run: npm run test:e2e
       - run: npm run test:types
       - run: npm publish --provenance --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
