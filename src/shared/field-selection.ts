@@ -12,7 +12,13 @@ export interface FieldSelectionOptions {
   separator?: string;
   /** Maximum nesting depth for dot-notation fields (default: 3) */
   maxDepth?: number;
+  /** Maximum number of requested field paths to honor */
+  maxFields?: number;
+  /** Maximum length of each requested field path */
+  maxFieldLength?: number;
 }
+
+const RESERVED_FIELD_SEGMENTS = new Set(['__proto__', 'prototype', 'constructor']);
 
 /**
  * Parse the fields query parameter into a list of field paths.
@@ -20,11 +26,21 @@ export interface FieldSelectionOptions {
  */
 export function parseFieldSelection(
   queryValue: string | string[] | undefined,
-  separator: string,
+  optionsOrSeparator: FieldSelectionOptions | string,
 ): string[] | undefined {
   const raw = Array.isArray(queryValue) ? queryValue[0] : queryValue;
   if (!raw || typeof raw !== 'string') return undefined;
-  const fields = raw.split(separator).map(f => f.trim()).filter(Boolean);
+  const options = typeof optionsOrSeparator === 'string'
+    ? { separator: optionsOrSeparator }
+    : optionsOrSeparator;
+  const separator = options.separator ?? ',';
+  let fields = raw.split(separator).map(f => f.trim()).filter(Boolean);
+  if (options.maxFieldLength !== undefined) {
+    fields = fields.filter(f => f.length <= options.maxFieldLength!);
+  }
+  if (options.maxFields !== undefined) {
+    fields = fields.slice(0, options.maxFields);
+  }
   return fields.length > 0 ? fields : undefined;
 }
 
@@ -51,12 +67,13 @@ export function pickFields(
 
   for (const fieldPath of fields) {
     const parts = fieldPath.split('.');
+    if (!isSafeFieldPath(parts)) continue;
     if (parts.length > maxDepth) continue;
 
     if (parts.length === 1) {
       // Top-level field
       const key = parts[0];
-      if (key in obj) {
+      if (hasSelectableOwnProperty(obj, key)) {
         result[key] = obj[key];
       }
     } else {
@@ -90,12 +107,12 @@ function setNestedField(
 
     if (i === parts.length - 1) {
       // Leaf — copy the value
-      if (key in srcObj) {
+      if (hasSelectableOwnProperty(srcObj, key)) {
         tgtCurrent[key] = srcObj[key];
       }
     } else {
       // Intermediate — ensure target has an object at this key
-      if (!(key in srcObj)) return; // Source doesn't have this path
+      if (!hasSelectableOwnProperty(srcObj, key)) return; // Source doesn't have this path
       if (tgtCurrent[key] === undefined || typeof tgtCurrent[key] !== 'object') {
         tgtCurrent[key] = {};
       }
@@ -103,4 +120,15 @@ function setNestedField(
       srcCurrent = srcObj[key];
     }
   }
+}
+
+function isSafeFieldPath(parts: string[]): boolean {
+  return parts.every(part => part !== '' && !RESERVED_FIELD_SEGMENTS.has(part));
+}
+
+function hasSelectableOwnProperty(
+  obj: Record<string, unknown>,
+  key: string,
+): boolean {
+  return Object.prototype.propertyIsEnumerable.call(obj, key);
 }

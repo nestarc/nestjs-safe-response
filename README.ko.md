@@ -13,8 +13,8 @@ NestJS API 응답을 자동으로 표준화된 JSON 구조로 감싸주는 패�
 - **요청 ID 추적** — 모든 응답에 `requestId` 필드 (수신 헤더 재사용, 자동 생성, 응답 헤더 전파)
 - **응답 시간** — `meta.responseTime` (ms) 자동 측정 옵션
 - **RFC 9457 Problem Details** — `application/problem+json` 표준 에러 포맷 옵트인
-- **필드 선택 (Partial Response)** — Google 스타일 `?fields=id,name` 쿼리 파라미터로 응답 필드 선택, 중첩 필드 dot-notation 지원
-- **에러 카탈로그** — `defineErrors()`로 에러 중앙 정의 + `SafeException`으로 키 기반 throw, status/message/code 자동 해석
+- **필드 선택 (Partial Response)** — Google 스타일 `?fields=id,name` 쿼리 파라미터로 응답 필드 선택, 중첩 필드 dot-notation, 제한 옵션, prototype-safe 경로 처리 지원
+- **에러 카탈로그** — `defineErrors()`로 에러 중앙 정의, 타입 지정 `SafeException` 팩토리, 카탈로그 기반 Swagger 에러 데코레이터 제공
 - **API 버전 메타데이터** — `meta.apiVersion` 자동 주입 옵트인
 - **StreamableFile 자동감지** — `StreamableFile` 반환 시 래핑 자동 스킵 (`@RawResponse()` 불필요)
 - **Swagger 연동** — `@ApiSafeResponse(Dto)`로 성공 스키마, `@ApiSafeErrorResponse()` / `@ApiSafeErrorResponses()`로 에러 스키마 — 래핑된 엔벨로프 구조 자동 생성
@@ -263,6 +263,32 @@ async register(@Body() dto: RegisterDto) {
 }
 ```
 
+### `@ApiSafeCatalogError(catalog, key)` / `@ApiSafeCatalogErrors(catalog, keys)`
+
+`defineErrors()` 카탈로그에서 에러 응답 문서를 바로 생성합니다. 에러 `code`
+예시는 카탈로그 키를 사용하고, status, message, description, details는
+카탈로그 정의에서 가져옵니다. 필요하면 호출 시 옵션으로 오버라이드할 수 있습니다.
+
+```typescript
+const errors = defineErrors({
+  USER_NOT_FOUND: {
+    status: 404,
+    message: 'User not found',
+    description: '요청한 사용자가 없습니다',
+  },
+  EMAIL_TAKEN: { status: 409, message: '이미 등록된 이메일' },
+});
+
+@Get(':id')
+@ApiSafeResponse(UserDto)
+@ApiSafeCatalogError(errors, 'USER_NOT_FOUND')
+findOne() { ... }
+
+@Post()
+@ApiSafeCatalogErrors(errors, ['USER_NOT_FOUND', 'EMAIL_TAKEN'])
+create() { ... }
+```
+
 ### `@RawResponse()`
 
 해당 라우트의 응답 래핑을 건너뜁니다.
@@ -427,7 +453,7 @@ findAll() { ... }
 
 `@ApiSafeResponse()` + `@ResponseMessage()` + `@ApiSafeErrorResponses()` 스택과 동일합니다.
 
-옵션: `statusCode`, `isArray`, `description`, `sort`, `filter`, `message`, `code`, `errors`, `deprecated`, `problemDetails`
+옵션: `statusCode`, `isArray`, `description`, `sort`, `filter`, `message`, `code`, `errors`, `deprecated`, `fieldSelection`, `problemDetails`, `errorFormat`
 
 #### `@SafePaginatedEndpoint(Model, options?)`
 
@@ -443,7 +469,7 @@ findAll() { ... }
 
 `@ApiPaginatedSafeResponse()` + `@Paginated()` + `@ApiSafeErrorResponses()` 스택과 동일합니다.
 
-옵션: `maxLimit`, `links`, `sort`, `filter`, `description`, `message`, `code`, `errors`, `deprecated`, `problemDetails`
+옵션: `maxLimit`, `links`, `sort`, `filter`, `description`, `message`, `code`, `errors`, `deprecated`, `fieldSelection`, `problemDetails`, `errorFormat`
 
 #### `@SafeCursorPaginatedEndpoint(Model, options?)`
 
@@ -458,9 +484,11 @@ findAll() { ... }
 
 `@ApiCursorPaginatedSafeResponse()` + `@CursorPaginated()` + `@ApiSafeErrorResponses()` 스택과 동일합니다.
 
-옵션: `maxLimit`, `links`, `sort`, `filter`, `description`, `message`, `code`, `errors`, `deprecated`, `problemDetails`
+옵션: `maxLimit`, `links`, `sort`, `filter`, `description`, `message`, `code`, `errors`, `deprecated`, `fieldSelection`, `problemDetails`, `errorFormat`
 
 > **`problemDetails` 옵션**: `true`이면 에러 응답이 Swagger에서 `application/problem+json` 스키마를 사용합니다. 모듈 레벨 `problemDetails` 설정과 일치시켜야 합니다 — 이 옵션은 Swagger 문서만 제어하며 런타임 동작에는 영향을 주지 않습니다.
+>
+> **`errorFormat` 옵션**: 새 복합 데코레이터 코드에서는 `errorFormat: 'problem' | 'safe'` 사용을 권장합니다. 의도한 에러 문서 포맷을 명확히 표현하며, `problemDetails`와 함께 제공되면 `errorFormat`이 우선합니다.
 
 ## 글로벌 에러 Swagger 문서화
 
@@ -573,7 +601,7 @@ import type { SafeAnyResponse } from '@nestarc/safe-response/client';
 import {
   isSuccess, isError, isPaginated, isOffsetPagination, isCursorPagination,
   isProblemDetailsResponse, hasResponseTime, hasSort, hasFilters,
-  isDeprecated, hasRateLimit,
+  isDeprecated, hasRateLimit, hasFieldSelection,
 } from '@nestarc/safe-response/client';
 
 // SafeAnyResponse는 성공, 에러, Problem Details 응답을 모두 포함합니다
@@ -594,6 +622,10 @@ if (isError(res)) {
 // RFC 9457 Problem Details (일반 에러와 다른 shape)
 if (isProblemDetailsResponse(res)) {
   console.error(res.type, res.detail, res.instance);
+}
+
+if (isSuccess(res) && hasFieldSelection(res.meta)) {
+  console.log(res.meta.fields);
 }
 ```
 
@@ -762,7 +794,9 @@ SafeResponseModule.register({
 
 - 중첩 필드 dot-notation 지원 (`address.city`)
 - 배열: 각 요소에 적용
+- 중첩 배열은 중첩 배열로 유지되며, 필드 경로를 내부 배열 경계 너머로 확장하지 않음
 - 존재하지 않는 필드: 자동 무시
+- 상속/prototype 경로와 예약 세그먼트(`__proto__`, `prototype`, `constructor`)는 무시
 - 데코레이터가 모듈 옵션보다 우선; `@FieldSelection(false)`로 특정 라우트 비활성화
 
 ### 커스텀 옵션
@@ -772,6 +806,8 @@ SafeResponseModule.register({
   queryParam: 'select',   // 파라미터명 (기본: 'fields')
   separator: ';',          // 구분자 (기본: ',')
   maxDepth: 2,             // 중첩 깊이 제한 (기본: 3)
+  maxFields: 20,           // 허용할 필드 경로 수 제한
+  maxFieldLength: 80,      // 너무 긴 필드 경로 제거
 })
 ```
 
@@ -780,7 +816,12 @@ SafeResponseModule.register({
 에러를 중앙에서 정의하고 키로 throw — 흩어진 상태 코드와 메시지를 제거합니다.
 
 ```typescript
-import { defineErrors, SafeException, SafeResponseModule } from '@nestarc/safe-response';
+import {
+  defineErrors,
+  createSafeException,
+  SafeException,
+  SafeResponseModule,
+} from '@nestarc/safe-response';
 
 // 1. 에러 정의
 const errors = defineErrors({
@@ -799,6 +840,10 @@ throw new SafeException('USER_NOT_FOUND');
 // throw 시 메시지나 details 오버라이드
 throw new SafeException('USER_NOT_FOUND', { message: '프로필을 찾을 수 없습니다' });
 throw new SafeException('VALIDATION_ERROR', { details: ['email이 유효하지 않습니다'] });
+
+// 선택사항: 카탈로그 키를 컴파일 타임에 제한하는 typed exception factory
+const CatalogException = createSafeException(errors);
+throw new CatalogException('EMAIL_TAKEN');
 ```
 
 에러 코드 해석 순서: `SafeException.errorKey` > `errorCodeMapper` > `errorCodes` > `DEFAULT_ERROR_CODE_MAP` > `'INTERNAL_SERVER_ERROR'`
@@ -975,11 +1020,11 @@ SafeResponseModule.register({
 
 | 카테고리 | 수량 | 검증 범위 |
 |----------|------|-----------|
-| 단위 테스트 | 473 | Interceptor, Exception Filter, Module DI, Decorators, Client Type Guards, i18n Adapter, Global Errors, Shared Utilities, Error Catalog, Field Selection |
-| E2E 테스트 (Express) | 65 | 복합 데코레이터, 선언적 에러 코드, 필드 선택, 에러 카탈로그, StreamableFile 포함 전체 HTTP 요청/응답 사이클 |
-| E2E 테스트 (Fastify) | 56 | Express와 동일한 기능 검증 — 전체 플랫폼 패리티 |
-| E2E 테스트 (Swagger) | 41 | Problem Details, Global Errors 포함 OpenAPI 스키마 출력 검증 |
-| 타입 테스트 | 84 | `tsd`로 Public API 타입 시그니처 검증 (클라이언트 타입 가드 + 복합 데코레이터 옵션 포함) |
+| 단위 테스트 | 514 | Interceptor, Exception Filter, Module DI, Decorators, Client Type Guards, i18n Adapter, Global Errors, Shared Utilities, Error Catalog, Field Selection |
+| E2E 테스트 (Express) | 66 | 복합 데코레이터, 선언적 에러 코드, 필드 선택, 에러 카탈로그, StreamableFile 포함 전체 HTTP 요청/응답 사이클 |
+| E2E 테스트 (Fastify) | 57 | Express와 동일한 기능 검증 — 전체 플랫폼 패리티 |
+| E2E 테스트 (Swagger) | 48 | Problem Details, Global Errors, 복합 데코레이터, 카탈로그 에러 포함 OpenAPI 스키마 출력 검증 |
+| 타입 테스트 | 146 assertions | `tsd`로 Public API 타입 시그니처 검증 (클라이언트 타입 가드, 카탈로그 헬퍼, 필드 선택 제한 옵션, 복합 데코레이터 옵션 포함) |
 | 스냅샷 | 2 | Swagger `components/schemas` + `paths` 회귀 감지 |
 
 ```bash
@@ -1005,10 +1050,10 @@ CI에서 강제 — 아래 기준 미달 시 빌드 실패:
 
 | 지표 | 임계값 |
 |------|--------|
-| Lines | 90% |
-| Statements | 90% |
-| Branches | 80% |
-| Functions | 60% |
+| Lines | 95% |
+| Statements | 95% |
+| Branches | 90% |
+| Functions | 95% |
 
 ### OpenAPI 스키마 유효성 검증
 

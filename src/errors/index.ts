@@ -63,3 +63,21 @@ export class SafeException extends HttpException {
     this.overrideDetails = options?.details;
   }
 }
+
+export function createSafeException<K extends string>(
+  catalog: ErrorCatalog<K>,
+): new (
+  key: K,
+  options?: { message?: string; details?: unknown },
+) => SafeException {
+  void catalog;
+
+  return class TypedSafeException extends SafeException {
+    constructor(
+      key: K,
+      options?: { message?: string; details?: unknown },
+    ) {
+      super(key, options);
+    }
+  };
+}

@@ -27,6 +27,7 @@ import {
   DEPRECATED_KEY,
   SORT_META_KEY,
   FILTER_META_KEY,
+  FIELD_SELECTION_KEY,
 } from '../constants';
 
 const RESPONSE_METADATA_KEY = 'swagger/apiResponse';
@@ -553,6 +554,15 @@ describe('SafeEndpoint', () => {
     expect(deprecated).toEqual({ sunset: '2026-12-31' });
   });
 
+  it('should apply @FieldSelection when fieldSelection option provided', () => {
+    class TestController {
+      @SafeEndpoint(UserDto, { fieldSelection: true })
+      find() {}
+    }
+    const fieldSelection = Reflect.getMetadata(FIELD_SELECTION_KEY, TestController.prototype.find);
+    expect(fieldSelection).toBe(true);
+  });
+
   it('should work with no options (minimal call)', () => {
     class TestController {
       @SafeEndpoint(UserDto)
@@ -582,6 +592,25 @@ describe('SafeEndpoint', () => {
     // Problem Details schema uses content with application/problem+json
     expect(meta[400]).toBeDefined();
     expect(meta[400].content?.['application/problem+json']).toBeDefined();
+  });
+
+  it('should use ApiSafeProblemResponse when errorFormat is problem', () => {
+    class TestController {
+      @SafeEndpoint(UserDto, { errors: [400], errorFormat: 'problem' })
+      find() {}
+    }
+    const meta = getResponseMetadata(TestController.prototype, 'find');
+    expect(meta[400].content?.['application/problem+json']).toBeDefined();
+  });
+
+  it('errorFormat should take priority over problemDetails alias', () => {
+    class TestController {
+      @SafeEndpoint(UserDto, { errors: [400], errorFormat: 'safe', problemDetails: true })
+      find() {}
+    }
+    const meta = getResponseMetadata(TestController.prototype, 'find');
+    expect(meta[400].schema?.allOf?.[0]?.$ref).toContain('SafeErrorResponseDto');
+    expect(meta[400].content?.['application/problem+json']).toBeUndefined();
   });
 });
 
@@ -615,6 +644,15 @@ describe('SafePaginatedEndpoint', () => {
     }
     expect(Reflect.getMetadata(SORT_META_KEY, TestController.prototype.find)).toBe(true);
     expect(Reflect.getMetadata(FILTER_META_KEY, TestController.prototype.find)).toBe(true);
+  });
+
+  it('should apply @FieldSelection(false) when fieldSelection is false', () => {
+    class TestController {
+      @SafePaginatedEndpoint(UserDto, { fieldSelection: false })
+      find() {}
+    }
+    const fieldSelection = Reflect.getMetadata(FIELD_SELECTION_KEY, TestController.prototype.find);
+    expect(fieldSelection).toBe(false);
   });
 
   it('should work with no options (minimal call)', () => {
@@ -667,6 +705,15 @@ describe('SafeCursorPaginatedEndpoint', () => {
     }
     const cursorPaginated = Reflect.getMetadata(CURSOR_PAGINATED_KEY, TestController.prototype.find);
     expect(cursorPaginated).toEqual({});
+  });
+
+  it('should apply @FieldSelection with options', () => {
+    class TestController {
+      @SafeCursorPaginatedEndpoint(UserDto, { fieldSelection: { maxFields: 2 } })
+      find() {}
+    }
+    const fieldSelection = Reflect.getMetadata(FIELD_SELECTION_KEY, TestController.prototype.find);
+    expect(fieldSelection).toEqual({ maxFields: 2 });
   });
 
   it('should use ApiSafeProblemResponse when problemDetails: true', () => {

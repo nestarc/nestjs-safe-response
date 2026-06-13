@@ -17,6 +17,7 @@ import {
 } from '../dto/response.dto';
 import { PaginatedOptions, CursorPaginatedOptions, ApiSafeErrorResponseOptions, ApiSafeErrorResponseConfig, DeprecatedOptions, SafeEndpointOptions, SafePaginatedEndpointOptions, SafeCursorPaginatedEndpointOptions } from '../interfaces';
 import { FieldSelectionOptions } from '../shared/field-selection';
+import type { ErrorCatalog } from '../errors';
 
 /**
  * Apply standard safe response wrapping + basic Swagger schema.
@@ -213,6 +214,29 @@ export function ApiSafeErrorResponses(
   return applyDecorators(...decorators);
 }
 
+export function ApiSafeCatalogError<K extends string>(
+  catalog: ErrorCatalog<K>,
+  key: K,
+  options?: ApiSafeErrorResponseOptions,
+): MethodDecorator {
+  const definition = catalog[key];
+  return ApiSafeErrorResponse(definition.status, {
+    description: options?.description ?? definition.description,
+    code: options?.code ?? key,
+    message: options?.message ?? definition.message,
+    details: options?.details ?? definition.details,
+  });
+}
+
+export function ApiSafeCatalogErrors<K extends string>(
+  catalog: ErrorCatalog<K>,
+  keys: readonly K[],
+): MethodDecorator {
+  return applyDecorators(
+    ...keys.map((key) => ApiSafeCatalogError(catalog, key)),
+  );
+}
+
 /**
  * Document a cursor-paginated response with Swagger schema.
  */
@@ -305,7 +329,7 @@ export const FilterMeta = () => SetMetadata(FILTER_META_KEY, true);
  * Allows clients to specify `?fields=id,name` to receive only selected fields.
  * Pass `false` to explicitly disable field selection on a route when the module-level option is enabled.
  */
-export const FieldSelection = (options?: FieldSelectionOptions | false) =>
+export const FieldSelection = (options?: FieldSelectionOptions | boolean) =>
   SetMetadata(FIELD_SELECTION_KEY, options ?? true);
 
 /**
@@ -402,9 +426,12 @@ export function SafeEndpoint<T extends Type>(
   if (options.message) decorators.push(ResponseMessage(options.message));
   if (options.code) decorators.push(SuccessCode(options.code));
   if (options.errors?.length) {
-    decorators.push(...buildErrorDecorators(options.errors, options.problemDetails));
+    decorators.push(...buildErrorDecorators(options.errors, resolveProblemDetailsDocs(options)));
   }
   if (options.deprecated) decorators.push(Deprecated(options.deprecated));
+  if (options.fieldSelection !== undefined) {
+    decorators.push(FieldSelection(options.fieldSelection));
+  }
 
   return applyDecorators(...decorators);
 }
@@ -431,9 +458,12 @@ export function SafePaginatedEndpoint<T extends Type>(
   if (options.message) decorators.push(ResponseMessage(options.message));
   if (options.code) decorators.push(SuccessCode(options.code));
   if (options.errors?.length) {
-    decorators.push(...buildErrorDecorators(options.errors, options.problemDetails));
+    decorators.push(...buildErrorDecorators(options.errors, resolveProblemDetailsDocs(options)));
   }
   if (options.deprecated) decorators.push(Deprecated(options.deprecated));
+  if (options.fieldSelection !== undefined) {
+    decorators.push(FieldSelection(options.fieldSelection));
+  }
 
   return applyDecorators(...decorators);
 }
@@ -460,9 +490,12 @@ export function SafeCursorPaginatedEndpoint<T extends Type>(
   if (options.message) decorators.push(ResponseMessage(options.message));
   if (options.code) decorators.push(SuccessCode(options.code));
   if (options.errors?.length) {
-    decorators.push(...buildErrorDecorators(options.errors, options.problemDetails));
+    decorators.push(...buildErrorDecorators(options.errors, resolveProblemDetailsDocs(options)));
   }
   if (options.deprecated) decorators.push(Deprecated(options.deprecated));
+  if (options.fieldSelection !== undefined) {
+    decorators.push(FieldSelection(options.fieldSelection));
+  }
 
   return applyDecorators(...decorators);
 }
@@ -490,4 +523,14 @@ function buildErrorDecorators(
       details: config.details,
     });
   });
+}
+
+function resolveProblemDetailsDocs(options: {
+  errorFormat?: 'safe' | 'problem';
+  problemDetails?: boolean;
+}): boolean | undefined {
+  if (options.errorFormat !== undefined) {
+    return options.errorFormat === 'problem';
+  }
+  return options.problemDetails;
 }

@@ -1,4 +1,4 @@
-import { expectType, expectAssignable, expectNotAssignable } from 'tsd';
+import { expectType, expectAssignable, expectError, expectNotAssignable } from 'tsd';
 import type {
   SafeSuccessResponse,
   SafeErrorResponse,
@@ -25,7 +25,14 @@ import type {
   ErrorCatalog,
   FieldSelectionOptions,
 } from './dist';
-import { applyGlobalErrors } from './dist';
+import {
+  ApiSafeCatalogError,
+  ApiSafeCatalogErrors,
+  applyGlobalErrors,
+  createSafeException,
+  defineErrors,
+  SafeException,
+} from './dist';
 import type { OpenAPIObject } from '@nestjs/swagger';
 
 // ─── SafeSuccessResponse<T> ───
@@ -555,6 +562,7 @@ expectType<'Not Found'>(DEFAULT_PROBLEM_TITLE_MAP[404]);
 
 import type {
   ErrorCodeMapperContext,
+  ErrorDocumentationFormat,
   SafeEndpointOptions,
   SafePaginatedEndpointOptions,
   SafeCursorPaginatedEndpointOptions,
@@ -600,6 +608,8 @@ const endpointOpts: SafeEndpointOptions = {
   code: 'OK',
   errors: [400, { status: 404, code: 'NOT_FOUND' }],
   deprecated: { sunset: '2026-12-31' },
+  fieldSelection: true,
+  errorFormat: 'problem',
 };
 void endpointOpts;
 
@@ -608,14 +618,20 @@ const paginatedOpts: SafePaginatedEndpointOptions = {
   links: true,
   sort: true,
   filter: true,
+  fieldSelection: false,
+  errorFormat: 'safe',
 };
 void paginatedOpts;
 
 const cursorPaginatedOpts: SafeCursorPaginatedEndpointOptions = {
   maxLimit: 50,
   links: true,
+  fieldSelection: { maxFields: 2, maxFieldLength: 20 },
 };
 void cursorPaginatedOpts;
+
+const errorDocumentationFormat: ErrorDocumentationFormat = 'problem';
+expectAssignable<'safe' | 'problem'>(errorDocumentationFormat);
 
 // ─── v0.14.0: apiVersion / fields on ResponseMeta ───
 
@@ -696,10 +712,12 @@ expectType<ErrorDefinition>(catalog.A);
 
 // ─── v0.14.0: FieldSelectionOptions ───
 
-const fsOpts: FieldSelectionOptions = { queryParam: 'select', separator: ';', maxDepth: 2 };
+const fsOpts: FieldSelectionOptions = { queryParam: 'select', separator: ';', maxDepth: 2, maxFields: 10, maxFieldLength: 40 };
 expectType<string | undefined>(fsOpts.queryParam);
 expectType<string | undefined>(fsOpts.separator);
 expectType<number | undefined>(fsOpts.maxDepth);
+expectType<number | undefined>(fsOpts.maxFields);
+expectType<number | undefined>(fsOpts.maxFieldLength);
 
 // Module option
 const optsWithFieldSelection: SafeResponseModuleOptions = { fieldSelection: true };
@@ -712,3 +730,22 @@ void optsWithFieldSelectionObj;
 // Module option: version
 const optsWithVersion: SafeResponseModuleOptions = { version: '2.0.0' };
 void optsWithVersion;
+
+// ─── v0.15.0: Error catalog DX helpers ───
+
+const typedCatalog = defineErrors({
+  USER_NOT_FOUND: { status: 404, message: 'User not found' },
+  EMAIL_TAKEN: { status: 409, message: 'Email already registered' },
+});
+
+const TypedSafeException = createSafeException(typedCatalog);
+expectAssignable<SafeException>(new TypedSafeException('USER_NOT_FOUND'));
+expectError(new TypedSafeException('UNKNOWN_ERROR'));
+
+ApiSafeCatalogError(typedCatalog, 'USER_NOT_FOUND');
+ApiSafeCatalogErrors(typedCatalog, ['USER_NOT_FOUND', 'EMAIL_TAKEN'] as const);
+expectError(ApiSafeCatalogError(typedCatalog, 'UNKNOWN_ERROR'));
+
+// Invalid metadata field types should remain rejected on explicit interfaces.
+expectNotAssignable<ResponseMeta>({ apiVersion: 123 });
+expectNotAssignable<ResponseMeta>({ fields: ['id', 123] });

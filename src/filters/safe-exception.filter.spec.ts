@@ -42,6 +42,20 @@ function createMockArgumentsHost(contextType = 'http') {
   } as unknown as ArgumentsHost;
 }
 
+function createMockArgumentsHostWithResponse(
+  mockResponse: Record<string, unknown>,
+) {
+  const mockRequest: Record<string, unknown> = { headers: {} };
+
+  return {
+    getType: () => 'http',
+    switchToHttp: () => ({
+      getRequest: () => mockRequest,
+      getResponse: () => mockResponse,
+    }),
+  } as unknown as ArgumentsHost;
+}
+
 function createMockArgumentsHostWithRequestId(options: {
   headers?: Record<string, string>;
   storedRequestId?: string;
@@ -356,6 +370,39 @@ describe('SafeExceptionFilter', () => {
       filter.catch(new BadRequestException(), host);
 
       expect(loggerErrorSpy).not.toHaveBeenCalled();
+    });
+  });
+
+  // ─── 이미 전송된 응답 방어 ───
+
+  describe('이미 전송된 응답 방어', () => {
+    it('Express headersSent=true이면 reply와 header write를 건너뜀', () => {
+      const { adapterHost, replyFn } = createMockHttpAdapterHost('/api/stream', 'GET');
+      const filter = createFilter(adapterHost, { requestId: true });
+      const response = { headersSent: true, setHeader: jest.fn() };
+      const host = createMockArgumentsHostWithResponse(response);
+      const error = new Error('stream failed');
+
+      filter.catch(error, host);
+
+      expect(replyFn).not.toHaveBeenCalled();
+      expect(response.setHeader).not.toHaveBeenCalled();
+      expect(loggerErrorSpy).toHaveBeenCalledWith(
+        'GET /api/stream 500 [-]',
+        error.stack,
+      );
+    });
+
+    it('Fastify sent=true이면 reply를 건너뜀', () => {
+      const { adapterHost, replyFn } = createMockHttpAdapterHost('/api/fastify', 'GET');
+      const filter = createFilter(adapterHost);
+      const response = { sent: true, header: jest.fn() };
+      const host = createMockArgumentsHostWithResponse(response);
+
+      filter.catch(new BadRequestException('bad'), host);
+
+      expect(replyFn).not.toHaveBeenCalled();
+      expect(response.header).not.toHaveBeenCalled();
     });
   });
 

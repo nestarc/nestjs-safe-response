@@ -15,6 +15,8 @@ export {
   ApiCursorPaginatedSafeResponse,
   ApiSafeErrorResponse,
   ApiSafeErrorResponses,
+  ApiSafeCatalogError,
+  ApiSafeCatalogErrors,
   ApiSafeProblemResponse,
   RawResponse,
   Paginated,
@@ -51,6 +53,7 @@ export type {
   RequestIdOptions,
   ApiSafeErrorResponseOptions,
   ApiSafeErrorResponseConfig,
+  ErrorDocumentationFormat,
   SortInfo,
   SwaggerOptions,
   ContextOptions,
@@ -65,7 +68,7 @@ export type {
 } from './interfaces';
 
 // Errors
-export { SafeException, defineErrors } from './errors';
+export { SafeException, defineErrors, createSafeException } from './errors';
 export type { ErrorDefinition, ErrorCatalog } from './errors';
 
 // Adapters

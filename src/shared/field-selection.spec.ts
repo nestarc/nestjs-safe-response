@@ -28,6 +28,20 @@ describe('parseFieldSelection', () => {
   it('빈 요소 필터링', () => {
     expect(parseFieldSelection('id,,name,', ',')).toEqual(['id', 'name']);
   });
+
+  it('maxFields 설정 시 지정한 개수까지만 반환', () => {
+    expect(parseFieldSelection('id,name,email', { separator: ',', maxFields: 2 } as never)).toEqual([
+      'id',
+      'name',
+    ]);
+  });
+
+  it('maxFieldLength 설정 시 긴 필드 경로 무시', () => {
+    expect(parseFieldSelection('id,displayName,email', { separator: ',', maxFieldLength: 5 } as never)).toEqual([
+      'id',
+      'email',
+    ]);
+  });
 });
 
 describe('pickFields', () => {
@@ -104,5 +118,24 @@ describe('pickFields', () => {
 
   it('빈 필드 배열', () => {
     expect(pickFields(data, [], 3)).toEqual({});
+  });
+
+  it('상속된 프로퍼티는 선택하지 않음', () => {
+    const inherited = Object.create({ inherited: 'hidden' }) as Record<string, unknown>;
+    inherited.id = 1;
+
+    expect(pickFields(inherited, ['id', 'inherited'], 3)).toEqual({ id: 1 });
+  });
+
+  it('prototype-sensitive 경로 세그먼트는 무시', () => {
+    const source = {
+      constructor: { value: 'unsafe' },
+      prototype: { value: 'unsafe' },
+      safe: { value: 'ok' },
+    };
+
+    expect(
+      pickFields(source, ['__proto__.polluted', 'constructor.value', 'prototype.value', 'safe.value'], 3),
+    ).toEqual({ safe: { value: 'ok' } });
   });
 });

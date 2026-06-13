@@ -56,6 +56,8 @@ import {
   buildDeprecationMeta,
   setDeprecationHeaders,
   extractRateLimitMeta,
+  isNonNegativeInteger,
+  isPositiveInteger,
 } from '../shared/response-helpers';
 import { FieldSelectionOptions, parseFieldSelection, pickFields } from '../shared/field-selection';
 
@@ -320,7 +322,7 @@ export class SafeResponseInterceptor implements NestInterceptor {
           const queryParam = config.queryParam ?? 'fields';
           const url = new URL(request.url ?? '', 'http://localhost');
           const fieldsParam = url.searchParams.get(queryParam) ?? undefined;
-          const selectedFields = parseFieldSelection(fieldsParam, config.separator ?? ',');
+          const selectedFields = parseFieldSelection(fieldsParam, config);
           if (selectedFields) {
             response.data = pickFields(response.data, selectedFields, config.maxDepth ?? 3);
             meta.fields = selectedFields;
@@ -401,9 +403,9 @@ export class SafeResponseInterceptor implements NestInterceptor {
       'page' in obj &&
       'limit' in obj &&
       Array.isArray(obj.data) &&
-      typeof obj.total === 'number' &&
-      typeof obj.page === 'number' &&
-      typeof obj.limit === 'number'
+      isNonNegativeInteger(obj.total) &&
+      isPositiveInteger(obj.page) &&
+      isPositiveInteger(obj.limit)
     );
   }
 
@@ -420,7 +422,11 @@ export class SafeResponseInterceptor implements NestInterceptor {
       Array.isArray(obj.data) &&
       (obj.nextCursor === null || typeof obj.nextCursor === 'string') &&
       typeof obj.hasMore === 'boolean' &&
-      typeof obj.limit === 'number'
+      isPositiveInteger(obj.limit) &&
+      (
+        obj.totalCount === undefined ||
+        isNonNegativeInteger(obj.totalCount)
+      )
     );
   }
 

@@ -108,6 +108,58 @@ describe('Swagger Schema E2E', () => {
     });
   });
 
+  // ─── @ApiCursorPaginatedSafeResponse() ───
+
+  describe('@ApiCursorPaginatedSafeResponse() (GET /swagger-test/cursor-paginated)', () => {
+    it('200 응답에 data 배열과 cursor meta.pagination이 포함되어야 한다', () => {
+      const responses = document.paths['/swagger-test/cursor-paginated'].get.responses;
+      expect(responses['200']).toBeDefined();
+      const schema = responses['200'].content['application/json'].schema;
+      expect(schema.allOf).toHaveLength(2);
+      expect(schema.allOf[0].$ref).toContain('SafeSuccessResponseDto');
+
+      const props = schema.allOf[1].properties;
+      expect(props.data.type).toBe('array');
+      expect(props.data.items.$ref).toContain('UserDto');
+      expect(props.meta.properties.pagination.$ref)
+        .toContain('CursorPaginationMetaDto');
+    });
+
+    it('CursorPaginationMetaDto가 components/schemas에 등록되어야 한다', () => {
+      expect(document.components.schemas.CursorPaginationMetaDto).toBeDefined();
+    });
+  });
+
+  // ─── Composite decorators ───
+
+  describe('컴포지트 데코레이터 Swagger 문서화', () => {
+    it('@SafeEndpoint()가 성공 응답과 에러 응답을 함께 문서화해야 한다', () => {
+      const responses = document.paths['/swagger-test/safe-endpoint'].get.responses;
+      expect(responses['200']).toBeDefined();
+      expect(responses['404']).toBeDefined();
+      expect(responses['200'].content['application/json'].schema.allOf[0].$ref)
+        .toContain('SafeSuccessResponseDto');
+      expect(responses['404'].content['application/json'].schema.allOf[0].$ref)
+        .toContain('SafeErrorResponseDto');
+    });
+
+    it('@SafePaginatedEndpoint()가 pagination schema와 에러 응답을 문서화해야 한다', () => {
+      const responses = document.paths['/swagger-test/safe-paginated'].get.responses;
+      const schema = responses['200'].content['application/json'].schema;
+      expect(schema.allOf[1].properties.meta.properties.pagination.$ref)
+        .toContain('PaginationMetaDto');
+      expect(responses['400']).toBeDefined();
+    });
+
+    it('@SafeCursorPaginatedEndpoint()가 cursor schema와 에러 응답을 문서화해야 한다', () => {
+      const responses = document.paths['/swagger-test/safe-cursor'].get.responses;
+      const schema = responses['200'].content['application/json'].schema;
+      expect(schema.allOf[1].properties.meta.properties.pagination.$ref)
+        .toContain('CursorPaginationMetaDto');
+      expect(responses['400']).toBeDefined();
+    });
+  });
+
   // ─── 단일 에러 응답 기본값 ───
 
   describe('단일 에러 응답 (GET /swagger-test/user/:id)', () => {
@@ -215,6 +267,31 @@ describe('Swagger Schema E2E', () => {
       expect(get400Code).toBe('BAD_REQUEST');
       expect(get401Code).toBe('UNAUTHORIZED');
       expect(get409Code).toBe('CONFLICT');
+    });
+  });
+
+  // ─── Error catalog decorators ───
+
+  describe('에러 카탈로그 Swagger 데코레이터', () => {
+    it('@ApiSafeCatalogError()가 catalog 정의를 문서화해야 한다', () => {
+      const responses = document.paths['/swagger-test/catalog-error-doc'].get.responses;
+      const response = responses['404'];
+      expect(response.description).toBe('Catalog user missing');
+      const errorProps = response.content['application/json'].schema.allOf[1]
+        .properties.error.properties;
+      expect(errorProps.code.example).toBe('USER_NOT_FOUND');
+      expect(errorProps.message.example).toBe('User not found');
+    });
+
+    it('@ApiSafeCatalogErrors()가 여러 catalog key를 문서화해야 한다', () => {
+      const responses = document.paths['/swagger-test/catalog-errors-doc'].get.responses;
+      expect(responses['404']).toBeDefined();
+      expect(responses['409']).toBeDefined();
+
+      const conflictProps = responses['409'].content['application/json']
+        .schema.allOf[1].properties.error.properties;
+      expect(conflictProps.code.example).toBe('EMAIL_TAKEN');
+      expect(conflictProps.message.example).toBe('Email already registered');
     });
   });
 

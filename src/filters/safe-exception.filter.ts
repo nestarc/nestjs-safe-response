@@ -36,6 +36,7 @@ import {
   resolveContextMeta,
   sanitizeRequestId,
   setResponseHeader,
+  isResponseSent,
   buildDeprecationMeta,
   setDeprecationHeaders,
   extractRateLimitMeta,
@@ -99,6 +100,8 @@ export class SafeExceptionFilter implements ExceptionFilter {
     const ctx = host.switchToHttp();
     const request = ctx.getRequest<SafeHttpRequest>();
     const response = ctx.getResponse<SafeHttpResponse>();
+    const requestUrl = httpAdapter.getRequestUrl(request);
+    const requestMethod = httpAdapter.getRequestMethod(request);
 
     // Idempotency guard: skip if another instance already handled this error
     if (request[REQUEST_ERROR_HANDLED]) {
@@ -148,6 +151,16 @@ export class SafeExceptionFilter implements ExceptionFilter {
       }
     }
 
+    if (isResponseSent(response)) {
+      if (statusCode >= 500) {
+        this.logger.error(
+          `${requestMethod} ${requestUrl} ${statusCode} [-]`,
+          exception instanceof Error ? exception.stack : undefined,
+        );
+      }
+      return;
+    }
+
     // Error code resolution chain:
     // 0. SafeException → errorKey as code (from catalog)
     // 1. errorCodeMapper(exception, context) → if returns string, use it
@@ -179,9 +192,6 @@ export class SafeExceptionFilter implements ExceptionFilter {
     }
 
     // Log 5xx errors with stack trace
-    const requestUrl = httpAdapter.getRequestUrl(request);
-    const requestMethod = httpAdapter.getRequestMethod(request);
-
     if (statusCode >= 500) {
       this.logger.error(
         `${requestMethod} ${requestUrl} ${statusCode} [${requestId ?? '-'}]`,

@@ -23,6 +23,12 @@ export interface SafeHttpRequest {
 /** Minimal response interface satisfied by both Express and Fastify response objects. */
 export interface SafeHttpResponse {
   statusCode?: number;
+  /** Express/Node response was already committed */
+  headersSent?: boolean;
+  /** Node response stream has ended */
+  writableEnded?: boolean;
+  /** Fastify reply was already sent */
+  sent?: boolean;
   /** Express response method */
   setHeader?: (name: string, value: string) => void;
   /** Fastify response method */
@@ -181,6 +187,24 @@ export function getResponseHeader(
   return String(value);
 }
 
+export function isPositiveInteger(value: unknown): value is number {
+  return typeof value === 'number' && Number.isFinite(value) && Number.isInteger(value) && value > 0;
+}
+
+export function isNonNegativeInteger(value: unknown): value is number {
+  return typeof value === 'number' && Number.isFinite(value) && Number.isInteger(value) && value >= 0;
+}
+
+export function isNonNegativeFiniteNumber(value: unknown): value is number {
+  return typeof value === 'number' && Number.isFinite(value) && value >= 0;
+}
+
+export function isResponseSent(response: SafeHttpResponse): boolean {
+  return response.headersSent === true
+    || response.writableEnded === true
+    || response.sent === true;
+}
+
 // ─── Deprecation helpers ─────────────────────────────────────────
 
 /**
@@ -294,7 +318,11 @@ export function extractRateLimitMeta(
   const remaining = Number(remainingStr);
   const reset = Number(resetStr);
 
-  if (Number.isNaN(limit) || Number.isNaN(remaining) || Number.isNaN(reset)) {
+  if (
+    !isNonNegativeFiniteNumber(limit) ||
+    !isNonNegativeFiniteNumber(remaining) ||
+    !isNonNegativeFiniteNumber(reset)
+  ) {
     return undefined;
   }
 
@@ -303,7 +331,7 @@ export function extractRateLimitMeta(
   const retryAfterStr = getResponseHeader(response, 'Retry-After');
   if (retryAfterStr) {
     const retryAfter = Number(retryAfterStr);
-    if (!Number.isNaN(retryAfter)) {
+    if (isNonNegativeFiniteNumber(retryAfter)) {
       meta.retryAfter = retryAfter;
     }
   }

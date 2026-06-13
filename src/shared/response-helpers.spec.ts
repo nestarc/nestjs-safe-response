@@ -8,6 +8,10 @@ import {
   buildDeprecationMeta,
   setDeprecationHeaders,
   extractRateLimitMeta,
+  isNonNegativeFiniteNumber,
+  isNonNegativeInteger,
+  isPositiveInteger,
+  isResponseSent,
   SafeHttpResponse,
 } from './response-helpers';
 import { I18nAdapter } from '../adapters/i18n.adapter';
@@ -239,6 +243,53 @@ describe('getResponseHeader', () => {
   });
 });
 
+describe('numeric validation helpers', () => {
+  it('isPositiveInteger는 양의 정수만 true', () => {
+    expect(isPositiveInteger(1)).toBe(true);
+    expect(isPositiveInteger(10)).toBe(true);
+    expect(isPositiveInteger(0)).toBe(false);
+    expect(isPositiveInteger(-1)).toBe(false);
+    expect(isPositiveInteger(1.5)).toBe(false);
+    expect(isPositiveInteger(Number.NaN)).toBe(false);
+    expect(isPositiveInteger(Number.POSITIVE_INFINITY)).toBe(false);
+  });
+
+  it('isNonNegativeInteger는 0 이상 정수만 true', () => {
+    expect(isNonNegativeInteger(0)).toBe(true);
+    expect(isNonNegativeInteger(5)).toBe(true);
+    expect(isNonNegativeInteger(-1)).toBe(false);
+    expect(isNonNegativeInteger(2.5)).toBe(false);
+    expect(isNonNegativeInteger(Number.NaN)).toBe(false);
+    expect(isNonNegativeInteger(Number.NEGATIVE_INFINITY)).toBe(false);
+  });
+
+  it('isNonNegativeFiniteNumber는 0 이상 finite number만 true', () => {
+    expect(isNonNegativeFiniteNumber(0)).toBe(true);
+    expect(isNonNegativeFiniteNumber(1.5)).toBe(true);
+    expect(isNonNegativeFiniteNumber(-1)).toBe(false);
+    expect(isNonNegativeFiniteNumber(Number.NaN)).toBe(false);
+    expect(isNonNegativeFiniteNumber(Number.POSITIVE_INFINITY)).toBe(false);
+  });
+});
+
+describe('isResponseSent', () => {
+  it('Express headersSent true → true', () => {
+    expect(isResponseSent({ headersSent: true })).toBe(true);
+  });
+
+  it('Node writableEnded true → true', () => {
+    expect(isResponseSent({ writableEnded: true })).toBe(true);
+  });
+
+  it('Fastify sent true → true', () => {
+    expect(isResponseSent({ sent: true })).toBe(true);
+  });
+
+  it('전송 플래그가 없으면 false', () => {
+    expect(isResponseSent({})).toBe(false);
+  });
+});
+
 describe('buildDeprecationMeta', () => {
   it('빈 옵션 → { deprecated: true }만', () => {
     const meta = buildDeprecationMeta({});
@@ -425,6 +476,24 @@ describe('extractRateLimitMeta', () => {
     expect(extractRateLimitMeta(res, true)).toBeUndefined();
   });
 
+  it('Infinity 값 → undefined', () => {
+    const res = mockResponse({
+      'X-RateLimit-Limit': 'Infinity',
+      'X-RateLimit-Remaining': '42',
+      'X-RateLimit-Reset': '1700000000',
+    });
+    expect(extractRateLimitMeta(res, true)).toBeUndefined();
+  });
+
+  it('음수 값 → undefined', () => {
+    const res = mockResponse({
+      'X-RateLimit-Limit': '100',
+      'X-RateLimit-Remaining': '-1',
+      'X-RateLimit-Reset': '1700000000',
+    });
+    expect(extractRateLimitMeta(res, true)).toBeUndefined();
+  });
+
   it('Retry-After 포함', () => {
     const res = mockResponse({
       'X-RateLimit-Limit': '100',
@@ -447,6 +516,18 @@ describe('extractRateLimitMeta', () => {
       'X-RateLimit-Remaining': '0',
       'X-RateLimit-Reset': '1700000000',
       'Retry-After': 'invalid',
+    });
+    const meta = extractRateLimitMeta(res, true);
+    expect(meta).toBeDefined();
+    expect(meta!.retryAfter).toBeUndefined();
+  });
+
+  it('Retry-After가 음수면 retryAfter 생략', () => {
+    const res = mockResponse({
+      'X-RateLimit-Limit': '100',
+      'X-RateLimit-Remaining': '0',
+      'X-RateLimit-Reset': '1700000000',
+      'Retry-After': '-1',
     });
     const meta = extractRateLimitMeta(res, true);
     expect(meta).toBeDefined();

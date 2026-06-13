@@ -554,6 +554,145 @@ exports[`Swagger Schema E2E API 계약 스냅샷 전체 paths 구조가 변경�
       ],
     },
   },
+  "/swagger-test/catalog-error-doc": {
+    "get": {
+      "operationId": "SwaggerTestController_catalogErrorDoc",
+      "parameters": [],
+      "responses": {
+        "404": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/SafeErrorResponseDto",
+                  },
+                  {
+                    "properties": {
+                      "error": {
+                        "properties": {
+                          "code": {
+                            "example": "USER_NOT_FOUND",
+                            "type": "string",
+                          },
+                          "message": {
+                            "example": "User not found",
+                            "type": "string",
+                          },
+                        },
+                        "type": "object",
+                      },
+                      "statusCode": {
+                        "example": 404,
+                        "type": "number",
+                      },
+                      "success": {
+                        "example": false,
+                        "type": "boolean",
+                      },
+                    },
+                  },
+                ],
+              },
+            },
+          },
+          "description": "Catalog user missing",
+        },
+      },
+      "tags": [
+        "SwaggerTest",
+      ],
+    },
+  },
+  "/swagger-test/catalog-errors-doc": {
+    "get": {
+      "operationId": "SwaggerTestController_catalogErrorsDoc",
+      "parameters": [],
+      "responses": {
+        "404": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/SafeErrorResponseDto",
+                  },
+                  {
+                    "properties": {
+                      "error": {
+                        "properties": {
+                          "code": {
+                            "example": "USER_NOT_FOUND",
+                            "type": "string",
+                          },
+                          "message": {
+                            "example": "User not found",
+                            "type": "string",
+                          },
+                        },
+                        "type": "object",
+                      },
+                      "statusCode": {
+                        "example": 404,
+                        "type": "number",
+                      },
+                      "success": {
+                        "example": false,
+                        "type": "boolean",
+                      },
+                    },
+                  },
+                ],
+              },
+            },
+          },
+          "description": "Catalog user missing",
+        },
+        "409": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/SafeErrorResponseDto",
+                  },
+                  {
+                    "properties": {
+                      "error": {
+                        "properties": {
+                          "code": {
+                            "example": "EMAIL_TAKEN",
+                            "type": "string",
+                          },
+                          "message": {
+                            "example": "Email already registered",
+                            "type": "string",
+                          },
+                        },
+                        "type": "object",
+                      },
+                      "statusCode": {
+                        "example": 409,
+                        "type": "number",
+                      },
+                      "success": {
+                        "example": false,
+                        "type": "boolean",
+                      },
+                    },
+                  },
+                ],
+              },
+            },
+          },
+          "description": "Error response (409)",
+        },
+      },
+      "tags": [
+        "SwaggerTest",
+      ],
+    },
+  },
   "/swagger-test/coexist": {
     "get": {
       "operationId": "SwaggerTestController_coexist",
@@ -705,6 +844,56 @@ exports[`Swagger Schema E2E API 계약 스냅샷 전체 paths 구조가 변경�
             },
           },
           "description": "User created",
+        },
+      },
+      "tags": [
+        "SwaggerTest",
+      ],
+    },
+  },
+  "/swagger-test/cursor-paginated": {
+    "get": {
+      "operationId": "SwaggerTestController_cursorPaginated",
+      "parameters": [],
+      "responses": {
+        "200": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/SafeSuccessResponseDto",
+                  },
+                  {
+                    "properties": {
+                      "data": {
+                        "items": {
+                          "$ref": "#/components/schemas/UserDto",
+                        },
+                        "type": "array",
+                      },
+                      "meta": {
+                        "properties": {
+                          "pagination": {
+                            "$ref": "#/components/schemas/CursorPaginationMetaDto",
+                          },
+                        },
+                      },
+                      "success": {
+                        "example": true,
+                        "type": "boolean",
+                      },
+                    },
+                    "required": [
+                      "success",
+                      "data",
+                    ],
+                  },
+                ],
+              },
+            },
+          },
+          "description": "Cursor-paginated response",
         },
       },
       "tags": [
@@ -1125,6 +1314,263 @@ exports[`Swagger Schema E2E API 계약 스냅샷 전체 paths 구조가 변경�
             },
           },
           "description": "User not found (RFC 9457)",
+        },
+      },
+      "tags": [
+        "SwaggerTest",
+      ],
+    },
+  },
+  "/swagger-test/safe-cursor": {
+    "get": {
+      "operationId": "SwaggerTestController_safeCursor",
+      "parameters": [],
+      "responses": {
+        "200": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/SafeSuccessResponseDto",
+                  },
+                  {
+                    "properties": {
+                      "data": {
+                        "items": {
+                          "$ref": "#/components/schemas/UserDto",
+                        },
+                        "type": "array",
+                      },
+                      "meta": {
+                        "properties": {
+                          "pagination": {
+                            "$ref": "#/components/schemas/CursorPaginationMetaDto",
+                          },
+                        },
+                      },
+                      "success": {
+                        "example": true,
+                        "type": "boolean",
+                      },
+                    },
+                    "required": [
+                      "success",
+                      "data",
+                    ],
+                  },
+                ],
+              },
+            },
+          },
+          "description": "Cursor-paginated response",
+        },
+        "400": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/SafeErrorResponseDto",
+                  },
+                  {
+                    "properties": {
+                      "error": {
+                        "properties": {
+                          "code": {
+                            "example": "BAD_REQUEST",
+                            "type": "string",
+                          },
+                          "message": {
+                            "example": "An error occurred",
+                            "type": "string",
+                          },
+                        },
+                        "type": "object",
+                      },
+                      "statusCode": {
+                        "example": 400,
+                        "type": "number",
+                      },
+                      "success": {
+                        "example": false,
+                        "type": "boolean",
+                      },
+                    },
+                  },
+                ],
+              },
+            },
+          },
+          "description": "Error response (400)",
+        },
+      },
+      "tags": [
+        "SwaggerTest",
+      ],
+    },
+  },
+  "/swagger-test/safe-endpoint": {
+    "get": {
+      "operationId": "SwaggerTestController_safeEndpoint",
+      "parameters": [],
+      "responses": {
+        "200": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/SafeSuccessResponseDto",
+                  },
+                  {
+                    "properties": {
+                      "data": {
+                        "$ref": "#/components/schemas/UserDto",
+                      },
+                      "success": {
+                        "example": true,
+                        "type": "boolean",
+                      },
+                    },
+                    "required": [
+                      "success",
+                      "data",
+                    ],
+                  },
+                ],
+              },
+            },
+          },
+          "description": "Successful response",
+        },
+        "404": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/SafeErrorResponseDto",
+                  },
+                  {
+                    "properties": {
+                      "error": {
+                        "properties": {
+                          "code": {
+                            "example": "NOT_FOUND",
+                            "type": "string",
+                          },
+                          "message": {
+                            "example": "An error occurred",
+                            "type": "string",
+                          },
+                        },
+                        "type": "object",
+                      },
+                      "statusCode": {
+                        "example": 404,
+                        "type": "number",
+                      },
+                      "success": {
+                        "example": false,
+                        "type": "boolean",
+                      },
+                    },
+                  },
+                ],
+              },
+            },
+          },
+          "description": "Error response (404)",
+        },
+      },
+      "tags": [
+        "SwaggerTest",
+      ],
+    },
+  },
+  "/swagger-test/safe-paginated": {
+    "get": {
+      "operationId": "SwaggerTestController_safePaginated",
+      "parameters": [],
+      "responses": {
+        "200": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/SafeSuccessResponseDto",
+                  },
+                  {
+                    "properties": {
+                      "data": {
+                        "items": {
+                          "$ref": "#/components/schemas/UserDto",
+                        },
+                        "type": "array",
+                      },
+                      "meta": {
+                        "properties": {
+                          "pagination": {
+                            "$ref": "#/components/schemas/PaginationMetaDto",
+                          },
+                        },
+                      },
+                      "success": {
+                        "example": true,
+                        "type": "boolean",
+                      },
+                    },
+                    "required": [
+                      "success",
+                      "data",
+                    ],
+                  },
+                ],
+              },
+            },
+          },
+          "description": "Paginated response",
+        },
+        "400": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/SafeErrorResponseDto",
+                  },
+                  {
+                    "properties": {
+                      "error": {
+                        "properties": {
+                          "code": {
+                            "example": "BAD_REQUEST",
+                            "type": "string",
+                          },
+                          "message": {
+                            "example": "An error occurred",
+                            "type": "string",
+                          },
+                        },
+                        "type": "object",
+                      },
+                      "statusCode": {
+                        "example": 400,
+                        "type": "number",
+                      },
+                      "success": {
+                        "example": false,
+                        "type": "boolean",
+                      },
+                    },
+                  },
+                ],
+              },
+            },
+          },
+          "description": "Error response (400)",
         },
       },
       "tags": [

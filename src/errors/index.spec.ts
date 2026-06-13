@@ -1,5 +1,5 @@
 import { HttpException } from '@nestjs/common';
-import { defineErrors, SafeException, ErrorCatalog } from './index';
+import { defineErrors, SafeException, ErrorCatalog, createSafeException } from './index';
 
 describe('defineErrors', () => {
   it('카탈로그를 그대로 반환', () => {
@@ -75,6 +75,37 @@ describe('SafeException', () => {
       message: 'Custom validation',
       details: ['name is required'],
     });
+    expect(error.overrideMessage).toBe('Custom validation');
+    expect(error.overrideDetails).toEqual(['name is required']);
+  });
+});
+
+describe('createSafeException', () => {
+  it('카탈로그 키로 제한된 SafeException 클래스를 생성', () => {
+    const catalog = defineErrors({
+      USER_NOT_FOUND: { status: 404, message: 'User not found' },
+      EMAIL_TAKEN: { status: 409, message: 'Email already registered' },
+    });
+    const AppSafeException = createSafeException(catalog);
+
+    const error = new AppSafeException('USER_NOT_FOUND');
+
+    expect(error).toBeInstanceOf(SafeException);
+    expect(error.errorKey).toBe('USER_NOT_FOUND');
+    expect(error.getStatus()).toBe(500);
+  });
+
+  it('message/details override를 기존 SafeException과 동일하게 저장', () => {
+    const catalog = defineErrors({
+      VALIDATION_ERROR: { status: 400, message: 'Validation failed' },
+    });
+    const AppSafeException = createSafeException(catalog);
+
+    const error = new AppSafeException('VALIDATION_ERROR', {
+      message: 'Custom validation',
+      details: ['name is required'],
+    });
+
     expect(error.overrideMessage).toBe('Custom validation');
     expect(error.overrideDetails).toEqual(['name is required']);
   });

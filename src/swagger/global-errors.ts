@@ -216,6 +216,7 @@ function ensureErrorSchema(document: Record<string, unknown>, useProblemDetails:
                   retryAfter: { type: 'number', example: 30 },
                 },
               },
+              apiVersion: { type: 'string', example: '2.1.0' },
             },
             additionalProperties: true,
           },
@@ -237,6 +238,31 @@ function ensureErrorSchema(document: Record<string, unknown>, useProblemDetails:
               message: { type: 'string', example: 'Validation failed' },
               details: {},
             },
+          },
+          meta: {
+            type: 'object',
+            properties: {
+              responseTime: { type: 'number', example: 42 },
+              deprecation: {
+                type: 'object',
+                properties: {
+                  deprecated: { type: 'boolean', example: true },
+                  since: { type: 'string', example: '2025-01-01T00:00:00.000Z' },
+                  sunset: { type: 'string', example: '2026-12-31T00:00:00.000Z' },
+                },
+              },
+              rateLimit: {
+                type: 'object',
+                properties: {
+                  limit: { type: 'number', example: 100 },
+                  remaining: { type: 'number', example: 42 },
+                  reset: { type: 'number', example: 1700000000 },
+                  retryAfter: { type: 'number', example: 30 },
+                },
+              },
+              apiVersion: { type: 'string', example: '2.1.0' },
+            },
+            additionalProperties: true,
           },
           timestamp: { type: 'string', example: '2025-03-21T12:00:00.000Z' },
           path: { type: 'string', example: '/api/users' },

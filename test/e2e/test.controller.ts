@@ -239,6 +239,12 @@ export class TestController {
     return { id: 42 };
   }
 
+  @Get('composite-field-selection')
+  @SafeEndpoint(ItemDto, { fieldSelection: true })
+  compositeFieldSelection() {
+    return { id: 7, name: 'Composite item', secret: 'hidden' };
+  }
+
   @Get('composite-cursor')
   @SafeCursorPaginatedEndpoint(ItemDto, { maxLimit: 25 })
   compositeCursor() {

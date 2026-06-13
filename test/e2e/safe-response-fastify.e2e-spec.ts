@@ -780,6 +780,15 @@ describe('SafeResponse E2E (Fastify)', () => {
 
       expect(res.body.data).toEqual({ id: 1, name: 'John', email: 'john@test.com', secret: 'hidden' });
     });
+
+    it('composite fieldSelection 옵션도 Fastify에서 동작', async () => {
+      const res = await request(app.getHttpServer())
+        .get('/test/composite-field-selection?fields=id')
+        .expect(200);
+
+      expect(res.body.data).toEqual({ id: 7 });
+      expect(res.body.meta.fields).toEqual(['id']);
+    });
   });
 
   describe('StreamableFile 자동감지', () => {

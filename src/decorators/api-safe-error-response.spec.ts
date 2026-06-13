@@ -1,4 +1,10 @@
-import { ApiSafeErrorResponse, ApiSafeErrorResponses } from './index';
+import {
+  ApiSafeCatalogError,
+  ApiSafeCatalogErrors,
+  ApiSafeErrorResponse,
+  ApiSafeErrorResponses,
+} from './index';
+import { defineErrors } from '../errors';
 
 const METADATA_KEY = 'swagger/apiResponse';
 
@@ -207,5 +213,73 @@ describe('ApiSafeErrorResponses', () => {
     expect(meta[401].description).toBe('Token expired');
     expect(meta[404].schema.allOf[1].properties.error.properties.code.example).toBe('USER_NOT_FOUND');
     expect(meta[404].schema.allOf[1].properties.error.properties.message.example).toBe('User does not exist');
+  });
+});
+
+describe('ApiSafeCatalogError', () => {
+  const catalog = defineErrors({
+    USER_NOT_FOUND: {
+      status: 404,
+      message: 'User not found',
+      description: 'The requested user does not exist',
+      details: { resource: 'user' },
+    },
+    EMAIL_TAKEN: {
+      status: 409,
+      message: 'Email already registered',
+    },
+  });
+
+  it('should document one catalog error using catalog defaults', () => {
+    class TestController {
+      @ApiSafeCatalogError(catalog, 'USER_NOT_FOUND')
+      find() {}
+    }
+
+    const meta = getResponseMetadata(TestController.prototype, 'find');
+    const errorProps = meta[404].schema.allOf[1].properties.error.properties;
+
+    expect(meta[404].description).toBe('The requested user does not exist');
+    expect(errorProps.code.example).toBe('USER_NOT_FOUND');
+    expect(errorProps.message.example).toBe('User not found');
+    expect(errorProps.details.example).toEqual({ resource: 'user' });
+  });
+
+  it('should allow per-call description/message/details overrides', () => {
+    class TestController {
+      @ApiSafeCatalogError(catalog, 'EMAIL_TAKEN', {
+        description: 'Custom conflict',
+        message: 'Custom email conflict',
+        details: ['email is already used'],
+      })
+      create() {}
+    }
+
+    const meta = getResponseMetadata(TestController.prototype, 'create');
+    const errorProps = meta[409].schema.allOf[1].properties.error.properties;
+
+    expect(meta[409].description).toBe('Custom conflict');
+    expect(errorProps.code.example).toBe('EMAIL_TAKEN');
+    expect(errorProps.message.example).toBe('Custom email conflict');
+    expect(errorProps.details.example).toEqual(['email is already used']);
+  });
+});
+
+describe('ApiSafeCatalogErrors', () => {
+  const catalog = defineErrors({
+    USER_NOT_FOUND: { status: 404, message: 'User not found' },
+    EMAIL_TAKEN: { status: 409, message: 'Email already registered' },
+  });
+
+  it('should document multiple catalog errors', () => {
+    class TestController {
+      @ApiSafeCatalogErrors(catalog, ['USER_NOT_FOUND', 'EMAIL_TAKEN'])
+      upsert() {}
+    }
+
+    const meta = getResponseMetadata(TestController.prototype, 'upsert');
+
+    expect(meta[404].schema.allOf[1].properties.error.properties.code.example).toBe('USER_NOT_FOUND');
+    expect(meta[409].schema.allOf[1].properties.error.properties.code.example).toBe('EMAIL_TAKEN');
   });
 });

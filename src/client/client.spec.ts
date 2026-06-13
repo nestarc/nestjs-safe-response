@@ -9,6 +9,7 @@ import {
   hasSort,
   hasFilters,
   isDeprecated,
+  hasFieldSelection,
   hasRateLimit,
   SafeSuccessResponse,
   SafeErrorResponse,
@@ -503,6 +504,32 @@ describe('Client Type Guards', () => {
       if (hasRateLimit(meta)) {
         expect(meta.rateLimit.retryAfter).toBe(30);
       }
+    });
+  });
+
+  describe('hasFieldSelection', () => {
+    it('유효한 fields 배열 → true', () => {
+      const meta: ResponseMeta = { fields: ['id', 'name'] };
+      expect(hasFieldSelection(meta)).toBe(true);
+    });
+
+    it('빈 fields 배열 → false', () => {
+      const meta: ResponseMeta = { fields: [] };
+      expect(hasFieldSelection(meta)).toBe(false);
+    });
+
+    it('fields 없음 → false', () => {
+      expect(hasFieldSelection({})).toBe(false);
+    });
+
+    it('fields가 배열이 아니면 false', () => {
+      const meta = { fields: 'id,name' } as unknown as ResponseMeta;
+      expect(hasFieldSelection(meta)).toBe(false);
+    });
+
+    it('fields 배열에 문자열이 아닌 값이 있으면 false', () => {
+      const meta = { fields: ['id', 123] } as unknown as ResponseMeta;
+      expect(hasFieldSelection(meta)).toBe(false);
     });
   });
 });

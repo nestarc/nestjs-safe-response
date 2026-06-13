@@ -171,6 +171,26 @@ describe('applyGlobalErrors', () => {
     expect(doc.components.schemas.SafeErrorResponseDto).toBeDefined();
   });
 
+  it('fallback SafeErrorResponseDto schema should include extensible meta with apiVersion', () => {
+    const doc: any = {
+      openapi: '3.0.0',
+      paths: { '/test': { get: { responses: {} } } },
+    };
+    const options: SafeResponseModuleOptions = {
+      swagger: { globalErrors: [500] },
+    };
+
+    applyGlobalErrors(doc, options);
+
+    const meta = doc.components.schemas.SafeErrorResponseDto.properties.meta;
+    expect(meta).toBeDefined();
+    expect(meta.additionalProperties).toBe(true);
+    expect(meta.properties.apiVersion).toEqual({
+      type: 'string',
+      example: '2.1.0',
+    });
+  });
+
   it('should not overwrite existing SafeErrorResponseDto schema', () => {
     const doc = createMinimalDocument();
     doc.components.schemas.SafeErrorResponseDto = { type: 'object', custom: true };
@@ -338,6 +358,26 @@ describe('applyGlobalErrors', () => {
       expect(doc.components.schemas.ProblemDetailsDto).toBeDefined();
       expect(doc.components.schemas.ProblemDetailsDto.properties.type).toBeDefined();
       expect(doc.components.schemas.ProblemDetailsDto.properties.status).toBeDefined();
+    });
+
+    it('fallback ProblemDetailsDto schema should include meta.apiVersion', () => {
+      const doc: any = {
+        openapi: '3.0.0',
+        paths: { '/test': { get: { responses: {} } } },
+      };
+      const options: SafeResponseModuleOptions = {
+        problemDetails: true,
+        swagger: { globalErrors: [500] },
+      };
+
+      applyGlobalErrors(doc, options);
+
+      const meta = doc.components.schemas.ProblemDetailsDto.properties.meta;
+      expect(meta.additionalProperties).toBe(true);
+      expect(meta.properties.apiVersion).toEqual({
+        type: 'string',
+        example: '2.1.0',
+      });
     });
 
     it('should use application/json when problemDetails is false', () => {

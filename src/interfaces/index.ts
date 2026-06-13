@@ -259,6 +259,8 @@ export type ApiSafeErrorResponseConfig =
   | number
   | ({ status: number } & ApiSafeErrorResponseOptions);
 
+export type ErrorDocumentationFormat = 'safe' | 'problem';
+
 export interface SafeEndpointOptions {
   /** HTTP status code for Swagger response (default: 200) */
   statusCode?: number;
@@ -278,6 +280,10 @@ export interface SafeEndpointOptions {
   errors?: ApiSafeErrorResponseConfig[];
   /** Mark endpoint as deprecated with RFC headers */
   deprecated?: DeprecatedOptions;
+  /** Enable or disable field selection for this route. Overrides module-level fieldSelection. */
+  fieldSelection?: boolean | import('../shared/field-selection').FieldSelectionOptions;
+  /** Error response documentation format for composite decorators. Runtime format is still module-level problemDetails. */
+  errorFormat?: ErrorDocumentationFormat;
   /**
    * Use RFC 9457 Problem Details schema for error responses in Swagger (default: false).
    * **Note:** This only controls Swagger documentation schema. The actual runtime error format
@@ -305,6 +311,10 @@ export interface SafePaginatedEndpointOptions {
   errors?: ApiSafeErrorResponseConfig[];
   /** Mark endpoint as deprecated with RFC headers */
   deprecated?: DeprecatedOptions;
+  /** Enable or disable field selection for this route. Overrides module-level fieldSelection. */
+  fieldSelection?: boolean | import('../shared/field-selection').FieldSelectionOptions;
+  /** Error response documentation format for composite decorators. Runtime format is still module-level problemDetails. */
+  errorFormat?: ErrorDocumentationFormat;
   /**
    * Use RFC 9457 Problem Details schema for error responses in Swagger (default: false).
    * **Note:** This only controls Swagger documentation schema. The actual runtime error format
@@ -332,6 +342,10 @@ export interface SafeCursorPaginatedEndpointOptions {
   errors?: ApiSafeErrorResponseConfig[];
   /** Mark endpoint as deprecated with RFC headers */
   deprecated?: DeprecatedOptions;
+  /** Enable or disable field selection for this route. Overrides module-level fieldSelection. */
+  fieldSelection?: boolean | import('../shared/field-selection').FieldSelectionOptions;
+  /** Error response documentation format for composite decorators. Runtime format is still module-level problemDetails. */
+  errorFormat?: ErrorDocumentationFormat;
   /**
    * Use RFC 9457 Problem Details schema for error responses in Swagger (default: false).
    * **Note:** This only controls Swagger documentation schema. The actual runtime error format

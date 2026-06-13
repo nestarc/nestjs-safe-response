@@ -4,12 +4,19 @@ import {
   SafeResponse,
   ApiSafeResponse,
   ApiPaginatedSafeResponse,
+  ApiCursorPaginatedSafeResponse,
   ApiSafeErrorResponse,
   ApiSafeErrorResponses,
+  ApiSafeCatalogError,
+  ApiSafeCatalogErrors,
   ApiSafeProblemResponse,
   Paginated,
   Deprecated,
+  SafeEndpoint,
+  SafePaginatedEndpoint,
+  SafeCursorPaginatedEndpoint,
 } from '../../src/decorators';
+import { defineErrors } from '../../src/errors';
 
 class UserDto {
   @ApiProperty({ example: 1 })
@@ -18,6 +25,18 @@ class UserDto {
   @ApiProperty({ example: 'John' })
   name!: string;
 }
+
+const swaggerErrors = defineErrors({
+  USER_NOT_FOUND: {
+    status: 404,
+    message: 'User not found',
+    description: 'Catalog user missing',
+  },
+  EMAIL_TAKEN: {
+    status: 409,
+    message: 'Email already registered',
+  },
+});
 
 @Controller('swagger-test')
 export class SwaggerTestController {
@@ -126,6 +145,53 @@ export class SwaggerTestController {
   @ApiPaginatedSafeResponse(UserDto, { description: 'Paginated users' })
   paginatedCustom() {
     return { data: [], total: 0, page: 1, limit: 20 };
+  }
+
+  /** @ApiCursorPaginatedSafeResponse() — cursor-paginated schema */
+  @Get('cursor-paginated')
+  @ApiCursorPaginatedSafeResponse(UserDto)
+  cursorPaginated() {
+    return {
+      data: [{ id: 1, name: 'John' }],
+      nextCursor: null,
+      hasMore: false,
+      limit: 20,
+    };
+  }
+
+  /** @SafeEndpoint() composite decorator */
+  @Get('safe-endpoint')
+  @SafeEndpoint(UserDto, { errors: [404], message: 'User fetched' })
+  safeEndpoint() {
+    return { id: 1, name: 'John' };
+  }
+
+  /** @SafePaginatedEndpoint() composite decorator */
+  @Get('safe-paginated')
+  @SafePaginatedEndpoint(UserDto, { errors: [400], maxLimit: 50 })
+  safePaginated() {
+    return { data: [], total: 0, page: 1, limit: 20 };
+  }
+
+  /** @SafeCursorPaginatedEndpoint() composite decorator */
+  @Get('safe-cursor')
+  @SafeCursorPaginatedEndpoint(UserDto, { errors: [400], maxLimit: 50 })
+  safeCursor() {
+    return { data: [], nextCursor: null, hasMore: false, limit: 20 };
+  }
+
+  /** Error catalog single decorator */
+  @Get('catalog-error-doc')
+  @ApiSafeCatalogError(swaggerErrors, 'USER_NOT_FOUND')
+  catalogErrorDoc() {
+    return {};
+  }
+
+  /** Error catalog bulk decorator */
+  @Get('catalog-errors-doc')
+  @ApiSafeCatalogErrors(swaggerErrors, ['USER_NOT_FOUND', 'EMAIL_TAKEN'])
+  catalogErrorsDoc() {
+    return {};
   }
 
   /** Coexistence: success + error on same method */

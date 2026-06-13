@@ -381,6 +381,29 @@ describe('SafeResponseInterceptor', () => {
 
       expect(result.meta?.pagination).toBeUndefined();
     });
+
+    it.each([
+      { data: { data: [], total: Number.NaN, page: 1, limit: 10 }, desc: 'total NaN' },
+      { data: { data: [], total: Number.POSITIVE_INFINITY, page: 1, limit: 10 }, desc: 'total Infinity' },
+      { data: { data: [], total: -1, page: 1, limit: 10 }, desc: 'total negative' },
+      { data: { data: [], total: 10, page: 1.5, limit: 10 }, desc: 'page fractional' },
+      { data: { data: [], total: 10, page: 1, limit: 0 }, desc: 'limit zero' },
+      { data: { data: [], total: 10, page: 1, limit: -5 }, desc: 'limit negative' },
+    ])('@Paginated() + invalid numeric metadata ($desc) → pagination meta skipped', async ({ data }) => {
+      jest.spyOn(reflector, 'get').mockImplementation((key) => {
+        if (key === PAGINATED_KEY) return true;
+        return undefined;
+      });
+      const interceptor = createInterceptor();
+      const ctx = createMockExecutionContext();
+
+      const result = await lastValueFrom(
+        interceptor.intercept(ctx, createMockCallHandler(data)),
+      );
+
+      expect(result.data).toEqual(data);
+      expect(result.meta?.pagination).toBeUndefined();
+    });
   });
 
   // ─── calculatePagination 경계값 ───
@@ -418,16 +441,6 @@ describe('SafeResponseInterceptor', () => {
         input: { data: [], total: 21, page: 1, limit: 20 },
         expected: { totalPages: 2, hasNext: true, hasPrev: false },
         desc: '경계값 나머지 1',
-      },
-      {
-        input: { data: [], total: 10, page: 1, limit: 0 },
-        expected: { totalPages: 10, hasNext: true, hasPrev: false, limit: 1 },
-        desc: 'limit 0 → 1로 클램핑 (0 나눗셈 방지)',
-      },
-      {
-        input: { data: [], total: 0, page: 1, limit: 0 },
-        expected: { totalPages: 0, hasNext: false, hasPrev: false, limit: 1 },
-        desc: 'limit 0 + total 0 → totalPages 0',
       },
     ])('$desc: total=$input.total, page=$input.page, limit=$input.limit', async ({ input, expected }) => {
       const interceptor = createInterceptor();
@@ -1128,7 +1141,7 @@ describe('SafeResponseInterceptor', () => {
       expect((result.meta?.pagination as any)?.previousCursor).toBeNull();
     });
 
-    it('@CursorPaginated() + limit: 0 → 1로 클램핑', async () => {
+    it('@CursorPaginated() + limit: 0 → cursor pagination meta skipped', async () => {
       jest.spyOn(reflector, 'get').mockImplementation((key) => {
         if (key === CURSOR_PAGINATED_KEY) return true;
         return undefined;
@@ -1146,7 +1159,29 @@ describe('SafeResponseInterceptor', () => {
         interceptor.intercept(ctx, createMockCallHandler(data)),
       );
 
-      expect(result.meta?.pagination?.limit).toBe(1);
+      expect(result.data).toEqual(data);
+      expect(result.meta?.pagination).toBeUndefined();
+    });
+
+    it.each([
+      { data: { data: [], nextCursor: null, hasMore: false, limit: Number.NaN }, desc: 'limit NaN' },
+      { data: { data: [], nextCursor: null, hasMore: false, limit: Number.POSITIVE_INFINITY }, desc: 'limit Infinity' },
+      { data: { data: [], nextCursor: null, hasMore: false, limit: 1.5 }, desc: 'limit fractional' },
+      { data: { data: [], nextCursor: null, hasMore: false, limit: 10, totalCount: -1 }, desc: 'totalCount negative' },
+    ])('@CursorPaginated() + invalid numeric metadata ($desc) → pagination meta skipped', async ({ data }) => {
+      jest.spyOn(reflector, 'get').mockImplementation((key) => {
+        if (key === CURSOR_PAGINATED_KEY) return true;
+        return undefined;
+      });
+      const interceptor = createInterceptor();
+      const ctx = createMockExecutionContext();
+
+      const result = await lastValueFrom(
+        interceptor.intercept(ctx, createMockCallHandler(data)),
+      );
+
+      expect(result.data).toEqual(data);
+      expect(result.meta?.pagination).toBeUndefined();
     });
 
     it('@CursorPaginated() + 비-커서 데이터 → 일반 래핑', async () => {

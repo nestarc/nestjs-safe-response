@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.15.0] - 2026-06-13
+
+### Added
+- **Error catalog DX helpers** — `createSafeException()` creates a typed `SafeException` subclass from a `defineErrors()` catalog, and `ApiSafeCatalogError()` / `ApiSafeCatalogErrors()` document catalog entries in Swagger without duplicating status/message/code examples.
+- **Composite decorator field selection** — `@SafeEndpoint()`, `@SafePaginatedEndpoint()`, and `@SafeCursorPaginatedEndpoint()` now accept `fieldSelection` so routes can enable or disable partial responses without stacking a separate decorator.
+- **Composite error documentation format alias** — composite decorators now accept `errorFormat: 'safe' | 'problem'` for explicit Swagger error schema selection. `errorFormat` takes priority over the older `problemDetails` documentation option when both are provided.
+- **Field selection quotas** — `FieldSelectionOptions` now supports `maxFields` and `maxFieldLength` to bound partial-response query complexity.
+- Additional Swagger E2E coverage for cursor pagination, composite decorators, and catalog-backed error decorators.
+
+### Changed
+- **Field selection hardening** — partial-response picking now ignores inherited properties and reserved path segments (`__proto__`, `prototype`, `constructor`), reducing prototype pollution and unexpected property exposure risk.
+- **Pagination shape validation** — offset and cursor pagination detection now requires finite integer metadata (`page`, `limit`, `total`, `totalCount`) instead of accepting `NaN`, `Infinity`, fractional, or negative values.
+- **Rate limit metadata validation** — malformed, negative, or non-finite rate limit headers are now ignored instead of being copied into `meta.rateLimit`.
+- `hasFieldSelection(meta)` now verifies every field entry is a string, not just that `fields` is a non-empty array.
+
+### Fixed
+- **Already-sent error responses** — the exception filter now detects Express/Fastify responses that have already been sent and avoids writing headers or bodies a second time.
+- **OpenAPI fallback schema parity** — `applyGlobalErrors()` fallback schemas now include `meta.apiVersion` and Safe Error response meta additional properties, matching runtime DTO shape.
+
 ## [0.14.0] - 2026-04-06
 
 ### Added

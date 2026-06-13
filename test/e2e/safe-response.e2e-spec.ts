@@ -748,6 +748,16 @@ describe('SafeResponse E2E', () => {
       expect(res.body.meta.message).toBe('Item fetched');
     });
 
+    it('GET /test/composite-field-selection?fields=id → composite fieldSelection filters data', async () => {
+      const res = await request(app.getHttpServer())
+        .get('/test/composite-field-selection?fields=id')
+        .expect(200);
+
+      expect(res.body.success).toBe(true);
+      expect(res.body.data).toEqual({ id: 7 });
+      expect(res.body.meta.fields).toEqual(['id']);
+    });
+
     it('GET /test/composite-cursor → @SafeCursorPaginatedEndpoint wraps cursor pagination', async () => {
       const res = await request(app.getHttpServer())
         .get('/test/composite-cursor')

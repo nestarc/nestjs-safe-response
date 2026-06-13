@@ -228,7 +228,8 @@ export function hasFieldSelection(
   return (
     meta?.fields !== undefined &&
     Array.isArray(meta.fields) &&
-    meta.fields.length > 0
+    meta.fields.length > 0 &&
+    meta.fields.every(field => typeof field === 'string')
   );
 }
 
